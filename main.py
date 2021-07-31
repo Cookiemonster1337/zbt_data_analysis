@@ -151,7 +151,8 @@ class ZBTentry(tk.Entry):
 
 
 main = ZBTwindow('Data Analysis', rows=10, columns=3)
-rootpath = Path('C:/Users/Kapp/Desktop/database/')
+rootpath = Path('C:/Users/inrel/Desktop/database/')
+rootpath = Path('data/database/')
 
 def buttonevent(subwindow, plotter=None):
     analysis = ZBTtoplevel(master=main, canvas=True, name=subwindow, rows=10, columns=10)
@@ -163,7 +164,7 @@ def buttonevent(subwindow, plotter=None):
     df_lib = pd.read_csv(str(rootpath) + '/database_poldata/poldata.csv', delimiter='\t')
     measurement_name = df_lib['sample'].unique()
 
-    var = tk.StringVar(main)
+    var = tk.StringVar(analysis.sub_top)
     var.set(measurement_name[0])
     option = tk.OptionMenu(analysis.sub_top, var, *measurement_name, command=lambda _: plotter_pol(var, df_lib,
                                                                                                    plotter_canvas,
@@ -184,8 +185,10 @@ def buttonevent(subwindow, plotter=None):
     plotter_canvas.get_tk_widget().pack(expand=True, fill=tk.BOTH)
 
     def plotter_pol(dropdown_var, df, canvas, subf1):
-        x_values = np.asarray(df['current [A]'])
-        y_values = np.asarray(df['voltage [V]'])
+
+        df_sample = df[]
+        x_values = np.asarray(df[df['current [A]'] == dropdown_var])
+        y_values = np.asarray(df[df['voltage [V]'] == dropdown_var])
         y2_values = np.asarray(df['power [W]'])
 
         subf1.plot(x_values, y_values, 'rs--', label=str(dropdown_var))
@@ -199,11 +202,25 @@ def buttonevent(subwindow, plotter=None):
 
         canvas.draw()
 
+        df_data = df[df['measurement_spec'] == dropdown_var]
+        df_data.sort_values(by=['pressure_rounded[bar]'], inplace=True)
+        df_x = df_data['pressure_rounded[bar]']
+        df_y_mean = df_data['resistance_mean[mOhm*cm2]']
+        df_y_scatter = df_data['resistance[mOhm*cm2]']
+        # df_y = [rmean for rmean in df_data['Contact Resistance / mOhm*cm²'] ]
+
+        ax.scatter(df_x, df_y_scatter, label=dropdown_var)
+        ax.plot(df_x, df_y_mean)
+        canvas.draw()
+
+
+
+
     analysis.mainloop()
 
 def get_file(frame):
     filename = \
-        tk.filedialog.askopenfilename(parent=frame, initialdir="C:/Users/Kapp/Desktop/exp_data", title="Select file",
+        tk.filedialog.askopenfilename(parent=frame, initialdir="data/exp_data", title="Select file",
                                       filetypes=(("all files", "*.*"), ("Text files", "*.txt")))
     import_poldata(filename)
 
@@ -220,7 +237,7 @@ def save_poldata(file, frame, entries):
 
     filename = str(entries[0]) + '.csv'
     df_pol_data.to_csv(str(rootpath) + '/database_poldata/' + filename, mode='w', header=True, index=False, sep='\t')
-    df_pol_data.to_csv(str(rootpath) + '/database_poldata/poldata.csv', mode='a', index=False, sep='\t')
+    df_pol_data.to_csv(str(rootpath) + '/database_poldata/poldata.csv', mode='a', header=False, index=False, sep='\t')
     # # save eis data to excel
     # wb_path = str(rootpath) + '/QMS_data/qms_data_library.xlsx'
     # book = load_workbook(wb_path)
@@ -236,9 +253,9 @@ def save_poldata(file, frame, entries):
 
 def verify_import(df, entries):
 
-    x_values = np.asarray(df['current [A]'])
+    x_values = np.asarray(df['current density [A/cm^2]'])
     y_values = np.asarray(df['voltage [V]'])
-    y2_values = np.asarray(df['power [W]'])
+    y2_values = np.asarray(df['power density [W]'])
 
     fig, ax = plt.subplots()
     ax.plot(x_values, y_values, 'rs--')
