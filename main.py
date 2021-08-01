@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from PIL import ImageTk, Image
 from matplotlib.figure import Figure
 import matplotlib.gridspec
+import os
 
 matplotlib.use('TkAgg')
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -161,13 +162,13 @@ def buttonevent(subwindow, plotter=None):
     sub_b1.grid(row=0, column=0, sticky='news', padx=10, pady=10)
 
     #data dropdown
-    df_lib = pd.read_csv('database/database_poldata/poldata.csv', delimiter='\t')
-    measurement_name = df_lib['sample'].unique()
+    # df_lib = pd.read_csv('database/database_poldata/poldata.csv', delimiter='\t')
+    # measurement_name = df_lib['sample'].unique()
 
+    files = [x for x in os.listdir('database/database_poldata/') if x.endswith(".csv")]
     var = tk.StringVar(analysis.sub_top)
-    var.set(measurement_name[0])
-    option = tk.OptionMenu(analysis.sub_top, var, *measurement_name, command=lambda _: plotter_pol(var.get(), df_lib,
-                                                                                                   plotter_canvas,
+    var.set(files[0])
+    option = tk.OptionMenu(analysis.sub_top, var, *files, command=lambda _: plotter_pol(var.get(), plotter_canvas,
                                                                                                    fig_ax1))
     option.grid(row=0, column=2, columnspan=6, sticky='ew', padx=10, pady=10)
 
@@ -184,11 +185,10 @@ def buttonevent(subwindow, plotter=None):
     plotter_canvas.get_tk_widget().configure(bg='red')
     plotter_canvas.get_tk_widget().pack(expand=True, fill=tk.BOTH)
 
-    def plotter_pol(dropdown_var, df, canvas, subf1):
+    def plotter_pol(dropdown_var, canvas, subf1):
 
-        df_sample = df[df['sample'] == dropdown_var]
+        df_sample = pd.read_csv('database/database_poldata/' + dropdown_var, delimiter='\t')
         pd.set_option('display.max_columns', None)
-        print(df_sample.head())
         x_values = np.asarray(df_sample['current density [A/cm^2]'])
         y_values = np.asarray(df_sample['voltage [V]'])
         y2_values = np.asarray(df_sample['power density [W/cm^2]'])
@@ -225,7 +225,7 @@ def save_poldata(file, frame, entries):
 
     filename = str(entries[0]) + '.csv'
     df_pol_data.to_csv('database/database_poldata/' + filename, mode='w', header=True, index=False, sep='\t')
-    df_pol_data.to_csv('database/database_poldata/poldata.csv', mode='a', header=False, index=False, sep='\t')
+    # df_pol_data.to_csv('database/database_poldata/poldata.csv', mode='a', header=False, index=False, sep='\t')
     # # save eis data to excel
     # wb_path = str(rootpath) + '/QMS_data/qms_data_library.xlsx'
     # book = load_workbook(wb_path)
