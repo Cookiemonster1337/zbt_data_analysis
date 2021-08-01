@@ -151,7 +151,7 @@ class ZBTentry(tk.Entry):
 
 
 main = ZBTwindow('Data Analysis', rows=10, columns=3)
-rootpath = Path('C:/Users/inrel/Desktop/database/')
+# rootpath = Path('C:/Users/inrel/Desktop/database/')
 rootpath = Path('data/database/')
 
 def buttonevent(subwindow, plotter=None):
@@ -161,12 +161,12 @@ def buttonevent(subwindow, plotter=None):
     sub_b1.grid(row=0, column=0, sticky='news', padx=10, pady=10)
 
     #data dropdown
-    df_lib = pd.read_csv(str(rootpath) + '/database_poldata/poldata.csv', delimiter='\t')
+    df_lib = pd.read_csv('database/database_poldata/poldata.csv', delimiter='\t')
     measurement_name = df_lib['sample'].unique()
 
     var = tk.StringVar(analysis.sub_top)
     var.set(measurement_name[0])
-    option = tk.OptionMenu(analysis.sub_top, var, *measurement_name, command=lambda _: plotter_pol(var, df_lib,
+    option = tk.OptionMenu(analysis.sub_top, var, *measurement_name, command=lambda _: plotter_pol(var.get(), df_lib,
                                                                                                    plotter_canvas,
                                                                                                    fig_ax1))
     option.grid(row=0, column=2, columnspan=6, sticky='ew', padx=10, pady=10)
@@ -186,41 +186,29 @@ def buttonevent(subwindow, plotter=None):
 
     def plotter_pol(dropdown_var, df, canvas, subf1):
 
-        df_sample = df[]
-        x_values = np.asarray(df[df['current [A]'] == dropdown_var])
-        y_values = np.asarray(df[df['voltage [V]'] == dropdown_var])
-        y2_values = np.asarray(df['power [W]'])
+        df_sample = df[df['sample'] == dropdown_var]
+        pd.set_option('display.max_columns', None)
+        print(df_sample.head())
+        x_values = np.asarray(df_sample['current density [A/cm^2]'])
+        y_values = np.asarray(df_sample['voltage [V]'])
+        y2_values = np.asarray(df_sample['power density [W/cm^2]'])
 
         subf1.plot(x_values, y_values, 'rs--', label=str(dropdown_var))
         subf1.legend(loc='best')
-        subf1.set_xlabel('Current [A]')
-        subf1.set_ylabel('Voltage[V]')
+        subf1.set_xlabel('current density [A/cm^2]')
+        subf1.set_ylabel('voltage [V]')
 
         subf2 = subf1.twinx()
         subf2.plot(x_values, y2_values, 'ks--')
-        subf2.set_ylabel('Power [W]')
+        subf2.set_ylabel('power density [W]')
 
         canvas.draw()
-
-        df_data = df[df['measurement_spec'] == dropdown_var]
-        df_data.sort_values(by=['pressure_rounded[bar]'], inplace=True)
-        df_x = df_data['pressure_rounded[bar]']
-        df_y_mean = df_data['resistance_mean[mOhm*cm2]']
-        df_y_scatter = df_data['resistance[mOhm*cm2]']
-        # df_y = [rmean for rmean in df_data['Contact Resistance / mOhm*cm²'] ]
-
-        ax.scatter(df_x, df_y_scatter, label=dropdown_var)
-        ax.plot(df_x, df_y_mean)
-        canvas.draw()
-
-
-
 
     analysis.mainloop()
 
 def get_file(frame):
     filename = \
-        tk.filedialog.askopenfilename(parent=frame, initialdir="data/exp_data", title="Select file",
+        tk.filedialog.askopenfilename(parent=frame, initialdir="exp_data/", title="Select file",
                                       filetypes=(("all files", "*.*"), ("Text files", "*.txt")))
     import_poldata(filename)
 
@@ -232,12 +220,12 @@ def save_poldata(file, frame, entries):
     df_pol_data = pd.DataFrame(pol_data)
     df_pol_data['current density [A/cm^2]'] = df_pol_data['current [A]'] / df_pol_data['area [cm^2]']
     df_pol_data['power [W]'] = df_pol_data['voltage [V]'] * df_pol_data['current [A]']
-    df_pol_data['power density [W]'] = df_pol_data['voltage [V]'] * df_pol_data['current density [A/cm^2]']
+    df_pol_data['power density [W/cm^2]'] = df_pol_data['voltage [V]'] * df_pol_data['current density [A/cm^2]']
     pd.set_option('display.max_columns', None)
 
     filename = str(entries[0]) + '.csv'
-    df_pol_data.to_csv(str(rootpath) + '/database_poldata/' + filename, mode='w', header=True, index=False, sep='\t')
-    df_pol_data.to_csv(str(rootpath) + '/database_poldata/poldata.csv', mode='a', header=False, index=False, sep='\t')
+    df_pol_data.to_csv('database/database_poldata/' + filename, mode='w', header=True, index=False, sep='\t')
+    df_pol_data.to_csv('database/database_poldata/poldata.csv', mode='a', header=False, index=False, sep='\t')
     # # save eis data to excel
     # wb_path = str(rootpath) + '/QMS_data/qms_data_library.xlsx'
     # book = load_workbook(wb_path)
