@@ -1,5 +1,4 @@
 TODO: Implement MongoDB
-mongodb compass
 # import relevant libraries
 from pymongo import MongoClient
 
@@ -29,3 +28,6 @@ entry = current_collection.find_one({'name': 'numbers2'})
 
 # print retrieved entry
 print(entry)
+
+
+

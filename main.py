@@ -10,6 +10,9 @@ from PIL import ImageTk, Image
 from matplotlib.figure import Figure
 import matplotlib.gridspec
 import os
+from pymongo import MongoClient
+from tkinter import ttk
+
 
 matplotlib.use('TkAgg')
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -21,6 +24,11 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 version, year = 0.1, 2021
 author = 'JKP'
 
+#pymongo
+client = MongoClient('172.16.134.6')
+db = client.testDB
+db.authenticate('mdb_LFD', 'zbtMongo!', source='testDB')
+current_collection = db['NMT_TestCollection']
 
 class ZBTframe(tk.Frame):
 
@@ -154,6 +162,10 @@ class ZBTentry(tk.Entry):
 main = ZBTwindow('Data Analysis', rows=10, columns=3)
 # rootpath = Path('C:/Users/inrel/Desktop/database/')
 rootpath = Path('data/database/')
+plot_list = []
+plot_df = []
+plot_dict = {}
+
 
 def buttonevent(subwindow, plotter=None):
     analysis = ZBTtoplevel(master=main, canvas=True, name=subwindow, rows=10, columns=10)
@@ -161,18 +173,37 @@ def buttonevent(subwindow, plotter=None):
     sub_b1 = ZBTbutton(master=analysis.sub_top, text='Import', command=lambda: get_file(analysis))
     sub_b1.grid(row=0, column=0, sticky='news', padx=10, pady=10)
 
-    #data dropdown
+    sub_b2 = ZBTbutton(master=analysis.sub_top, text='Delete', command=lambda: delete_file(analysis, var.get()))
+    sub_b2.grid(row=1, column=0, sticky='news', padx=10, pady=10)
+
+    sub_b3 = ZBTbutton(master=analysis.sub_top, text='Edit', command=lambda: edit_file(analysis, var.get()))
+    sub_b3.grid(row=2, column=0, sticky='news', padx=10, pady=10)
+
+    ttk.Style().configure('Treeview', bg='blue', fg='green', fieldbackground='red')
+
+    data_table = ttk.Treeview(master=analysis.sub_left, columns=(0, 1, 2, 3, 4), show='headings', height=5)
+    data_table.column(0, width=60)
+    data_table.column(1, width=60, anchor='e')
+    data_table.column(2, width=60, anchor='e')
+    data_table.column(3, width=60, anchor='e')
+    data_table.column(4, width=60, anchor='e')
+    data_table.grid(row=1, column=2, sticky='news', padx=10, pady=10)
+
     # df_lib = pd.read_csv('database/database_poldata/poldata.csv', delimiter='\t')
     # measurement_name = df_lib['sample'].unique()
 
-    files = [x for x in os.listdir('database/database_poldata/') if x.endswith(".csv")]
+    #files = [x for x in os.listdir('database/database_poldata/') if x.endswith(".csv")]
+    files = current_collection.find({}, {'_id': 0, 'name': 1})
     var = tk.StringVar(analysis.sub_top)
     var.set(files[0])
     option = tk.OptionMenu(analysis.sub_top, var, *files, command=lambda _: plotter_pol(var.get(), plotter_canvas,
-                                                                                                   fig_ax1))
+                                                                                        fig_ax1, fig_ax2, data_table))
+
     option.grid(row=0, column=2, columnspan=6, sticky='ew', padx=10, pady=10)
 
-    #plotting
+
+
+    #plotter
     plotter_fig = Figure()
     plotter_fig.set_facecolor('lightgrey')
     plotter_fig.set_edgecolor('black')
@@ -180,29 +211,84 @@ def buttonevent(subwindow, plotter=None):
 
     fig_ax1 = plotter_fig.add_subplot(grid[:10, :10])
     fig_ax1.set_title('POL-Curve', pad=10, fontdict=dict(fontsize=18, weight='bold'))
+    fig_ax1.set_xlabel('current density [A/cm^2]')
+    fig_ax1.set_ylabel('voltage [V]')
+
+    fig_ax2 = fig_ax1.twinx()
+    fig_ax2.set_ylabel('power density [W/cm^2]')
 
     plotter_canvas = FigureCanvasTkAgg(plotter_fig, master=analysis.sub_canvas)
     plotter_canvas.get_tk_widget().configure(bg='red')
     plotter_canvas.get_tk_widget().pack(expand=True, fill=tk.BOTH)
 
-    def plotter_pol(dropdown_var, canvas, subf1):
+    def plotter_pol(dropdown_var, canvas, subf1, subf2, data_table):
 
-        df_sample = pd.read_csv('database/database_poldata/' + dropdown_var, delimiter='\t')
-        pd.set_option('display.max_columns', None)
-        x_values = np.asarray(df_sample['current density [A/cm^2]'])
-        y_values = np.asarray(df_sample['voltage [V]'])
-        y2_values = np.asarray(df_sample['power density [W/cm^2]'])
+        subf1.cla()
+        subf2.cla()
+        data_table.delete(*data_table.get_children())
 
-        subf1.plot(x_values, y_values, 'rs--', label=str(dropdown_var))
-        subf1.legend(loc='best')
-        subf1.set_xlabel('current density [A/cm^2]')
-        subf1.set_ylabel('voltage [V]')
+        if dropdown_var in plot_list:
+            plot_list.remove(dropdown_var)
+            del plot_dict[dropdown_var]
+        else:
+            plot_list.append(dropdown_var)
 
-        subf2 = subf1.twinx()
-        subf2.plot(x_values, y2_values, 'ks--')
-        subf2.set_ylabel('power density [W]')
+
+        for i in plot_list:
+            entry = current_collection.find_one({'name': i[10:-2]}, {'_id': 0})
+            pol_data = pd.DataFrame.from_dict(entry.get('pol_data'))
+            table_data = [entry.get('name'), entry.get('date'), entry.get('area [cm^2]'), \
+                          entry.get('flowrate_cathode [ml/min]'), entry.get('flowrate_anode [ml/min]'), \
+                          entry.get('temperature [°C]')]
+
+            x_values = np.asarray(pol_data['current density [A/cm^2]'])
+            y_values = np.asarray(pol_data['voltage [V]'])
+            y2_values = np.asarray(pol_data['power density [W/cm^2]'])
+
+            # df_sample = pd.read_csv('database/database_poldata/' + dropdown_var, delimiter='\t')
+            # x_values = np.asarray(df_sample['current density [A/cm^2]'])
+            # y_values = np.asarray(df_sample['voltage [V]'])
+            # y2_values = np.asarray(df_sample['power density [W/cm^2]'])
+
+            plot1 = subf1.plot(x_values, y_values, 's-', label=str(i[10:-2]))
+            subf1.legend(loc='best')
+
+            plot2 = subf2.plot(x_values, y2_values, '^--', color=plot1[0].get_color())
+
+            pd.set_option('display.max_columns', None)
+
+            plot_dict[i] = table_data
+
+        samples, dates, areas, flow_c, flow_a, temp = ['sample'], ['date'], ['area'], ['flow_c'], ['flow_a'], ['temp']
+
+        i = 1
+        #data_table.heading(column=0, text='sample')
+
+        for key, value in plot_dict.items():
+            print(key)
+            # data_table.heading(column=i, text=value[0][10:-2])
+            i += 1
+
+            samples.append(value[0])
+            dates.append(value[1])
+            areas.append(value[2])
+            flow_c.append(value[3])
+            flow_a.append(value[4])
+            temp.append(value[5])
+
+        data_table.insert('', 'end', values=samples, tags=('odd'))
+        data_table.insert('', 'end', values=dates)
+        data_table.insert('', 'end', values=areas)
+        data_table.insert('', 'end', values=flow_c)
+        data_table.insert('', 'end', values=flow_a)
+        data_table.insert('', 'end', values=temp)
+        data_table.insert('', 'end', values=('add. info', ''))
+
+        # TODO:
+        data_table.tag_configure('odd', background='#008001')
 
         canvas.draw()
+
 
     analysis.mainloop()
 
@@ -211,6 +297,107 @@ def get_file(frame):
         tk.filedialog.askopenfilename(parent=frame, initialdir="exp_data/", title="Select file",
                                       filetypes=(("all files", "*.*"), ("Text files", "*.txt")))
     import_poldata(filename)
+
+def delete_file(frame, dropdown_var):
+    result = messagebox.askyesno(parent=frame, title="Data Warning", message="Delete " + str(dropdown_var) + '?')
+    if result == True:
+        current_collection.delete_one({'name': dropdown_var[10:-2]})
+        print('deleted ' + str(dropdown_var) + 'from database!')
+
+def edit_file(frame, dropdown_var):
+    data = current_collection.find_one({'name': dropdown_var[10:-2]}, {'_id': 0})
+
+    editor = ZBTtoplevel(master=frame, name='Edit File', rows=10, columns=3, x_dim=400, y_dim=500)
+
+    l1_pol_edit = ZBTlabel(master=editor.sub_top, font_size=10, text='Sample:')
+    l1_pol_edit.grid(row=0, column=0, sticky='nws')
+
+    l2_pol_edit = ZBTlabel(master=editor.sub_top, font_size=10, text='Date:')
+    l2_pol_edit.grid(row=1, column=0, sticky='nws')
+
+    l3_pol_edit = ZBTlabel(master=editor.sub_top, font_size=10, text='Area')
+    l3_pol_edit.grid(row=2, column=0, sticky='nws')
+
+    l4_pol_edit = ZBTlabel(master=editor.sub_top, font_size=10, text='FlowRate (C)')
+    l4_pol_edit.grid(row=3, column=0, sticky='nws')  #
+
+    l5_pol_edit = ZBTlabel(master=editor.sub_top, font_size=10, text='FlowRate (A)')
+    l5_pol_edit.grid(row=4, column=0, sticky='nws')
+
+    l6_pol_edit = ZBTlabel(master=editor.sub_top, font_size=10, text='Temperature')
+    l6_pol_edit.grid(row=5, column=0, sticky='nws')
+
+    l7_pol_edit = ZBTlabel(master=editor.sub_top, font_size=10, text='Opt. Info:')
+    l7_pol_edit.grid(row=6, column=0, sticky='nws')
+
+    l02_pol_edit = ZBTlabel(master=editor.sub_top, font_size=10, text='dd.mm.yyyy')
+    l02_pol_edit.grid(row=1, column=2, sticky='nes')
+
+    l03_pol_edit = ZBTlabel(master=editor.sub_top, font_size=10, text='cm²')
+    l03_pol_edit.grid(row=2, column=2, sticky='nes')
+
+    l04_pol_edit = ZBTlabel(master=editor.sub_top, font_size=10, text='l/min')
+    l04_pol_edit.grid(row=3, column=2, sticky='nes')
+
+    l05_pol_edit = ZBTlabel(master=editor.sub_top, font_size=10, text='l/min')
+    l05_pol_edit.grid(row=4, column=2, sticky='nes')
+
+    l06_pol_edit = ZBTlabel(master=editor.sub_top, font_size=10, text='°C')
+    l06_pol_edit.grid(row=5, column=2, sticky='nes')
+
+    e1_pol_edit = ZBTentry(master=editor.sub_top)
+    e1_pol_edit.grid(row=0, column=1, sticky='ew')
+    e1_pol_edit.insert(0, data.get('name'))
+
+    e2_pol_edit = ZBTentry(master=editor.sub_top)
+    e2_pol_edit.grid(row=1, column=1, sticky='ew')
+    e2_pol_edit.insert(0, data.get('date'))
+
+    e3_pol_edit = ZBTentry(master=editor.sub_top)
+    e3_pol_edit.grid(row=2, column=1, sticky='ew')
+    e3_pol_edit.insert(0, data.get('area [cm^2]'))
+
+    e4_pol_edit = ZBTentry(master=editor.sub_top)
+    e4_pol_edit.grid(row=3, column=1, sticky='ew')
+    e4_pol_edit.insert(0, data.get('flow_rate_cathode [ml/min]'))
+
+    e5_pol_edit = ZBTentry(master=editor.sub_top)
+    e5_pol_edit.grid(row=4, column=1, sticky='ew')
+    e5_pol_edit.insert(0, data.get('flow_rate_anode [ml/min]'))
+
+    e6_pol_edit = ZBTentry(master=editor.sub_top)
+    e6_pol_edit.grid(row=5, column=1, sticky='ew')
+    e6_pol_edit.insert(0, data.get('temperature [°C]'))
+
+    e7_pol_edit = ZBTentry(master=editor.sub_top)
+    e7_pol_edit.grid(row=6, column=1, rowspan=2, sticky='news')
+    e7_pol_edit.insert(0, data.get('add_info'))
+
+    b1_pol_edit = ZBTbutton(master=editor.sub_top, text='OK', command=lambda: data_edit(editor, dropdown_var,
+                                                                                        e1_pol_edit.get(),
+                                                                                        e2_pol_edit.get(),
+                                                                                        e3_pol_edit.get(),
+                                                                                        e4_pol_edit.get(),
+                                                                                        e5_pol_edit.get(),
+                                                                                        e6_pol_edit.get(),
+                                                                                        e7_pol_edit.get()))
+
+    b1_pol_edit.grid(row=7, column=1, sticky='news')
+
+def data_edit(frame, dropdown_var, e1, e2, e3, e4, e5, e6, e7):
+
+    entries = [e1, e2, e3, e4, e5, e6, e7]
+
+    current_collection.update_one({'name': dropdown_var[10:-2]}, {'$set': {"name": entries[0], 'date': entries[1],
+                                                                  'add_info': entries[6], 'area [cm^2]': entries[2],
+                                                                  'flow_rate_cathode [ml/min]': entries[3],
+                                                                  'flow_rate_anode [ml/min]': entries[4],
+                                                                  'temperature [°C]': entries[5]}})
+
+
+
+    frame.destroy()
+
 
 def save_poldata(file, frame, entries):
     df_input = pd.read_csv(file, sep='\t', decimal='.', encoding='cp1252', error_bad_lines=False)
@@ -223,8 +410,18 @@ def save_poldata(file, frame, entries):
     df_pol_data['power density [W/cm^2]'] = df_pol_data['voltage [V]'] * df_pol_data['current density [A/cm^2]']
     pd.set_option('display.max_columns', None)
 
+    df_pol_data_dict = df_pol_data[['current [A]', 'voltage [V]', 'power [W]', 'current density [A/cm^2]',
+                                    'power density [W/cm^2]']]
+    pol_data_dict = df_pol_data_dict.to_dict('records')
+    db_data_dict = {"name": entries[0], 'date': entries[1], 'add_info': entries[6], 'area [cm^2]': entries[2],
+                    'flow_rate_cathode [ml/min]': entries[3], 'flow_rate_anode [ml/min]': entries[4],
+                    'temperature [°C]': entries[5], 'pol_data': pol_data_dict}
+
+    current_collection.insert_one(db_data_dict)
+
     filename = str(entries[0]) + '.csv'
     df_pol_data.to_csv('database/database_poldata/' + filename, mode='w', header=True, index=False, sep='\t')
+
     # df_pol_data.to_csv('database/database_poldata/poldata.csv', mode='a', header=False, index=False, sep='\t')
     # # save eis data to excel
     # wb_path = str(rootpath) + '/QMS_data/qms_data_library.xlsx'
@@ -235,15 +432,15 @@ def save_poldata(file, frame, entries):
     # writer.save()
     # writer.close()
 
-    frame.destroy()
-
     verify_import(df_pol_data, entries)
+
+    frame.destroy()
 
 def verify_import(df, entries):
 
     x_values = np.asarray(df['current density [A/cm^2]'])
     y_values = np.asarray(df['voltage [V]'])
-    y2_values = np.asarray(df['power density [W]'])
+    y2_values = np.asarray(df['power density [W/cm^2]'])
 
     fig, ax = plt.subplots()
     ax.plot(x_values, y_values, 'rs--')
@@ -261,17 +458,14 @@ def verify_import(df, entries):
 
     plt.show()
 
-
-
 def data_check(frame, file, e1, e2, e3, e4, e5, e6, e7):
 
     entries = [e1, e2, e3, e4, e5, e6, e7]
 
     if '' in entries:
-            messagebox.showinfo(parent=frame, title="Data Error", message="Incomplete Data!!!")
+        messagebox.showinfo(parent=frame, title="Data Error", message="Incomplete Data!!!")
     else:
         save_poldata(file, frame, entries)
-
 
 def import_poldata(file):
     pol_import = ZBTtoplevel('Import POL-Data', rows=12, columns=3, x_dim=500, y_dim=400)
