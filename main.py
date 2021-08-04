@@ -104,9 +104,9 @@ class ZBTtoplevel(tk.Toplevel):
             self.rowconfigure(2, weight=1)
             self.sub_top = ZBTframe(rows, columns, height=(y_dim-20)/4*1, width=x_dim, master=self)
             self.sub_top.grid_propagate(0)
-            self.sub_left = ZBTframe(rows, 3, height=(y_dim-20)/4*3, width=x_dim/4*1, master=self)
+            self.sub_left = ZBTframe(rows, 2, height=(y_dim-20)/4*3, width=x_dim/5*1, master=self)
             self.sub_left.grid_propagate(0)
-            self.sub_canvas = ZBTframe(rows, 7, height=(y_dim-20)/4*3, width=x_dim/4*3, master=self, bg='blue')
+            self.sub_canvas = ZBTframe(rows, 8, height=(y_dim-20)/4*3, width=x_dim/5*4, master=self, bg='blue')
             self.sub_canvas.grid_propagate(0)
             self.sub_bot = ZBTframe(1, 1, height=20, width=x_dim, bg='grey25', master=self)
             self.sub_bot.grid_propagate(0)
@@ -179,15 +179,20 @@ def buttonevent(subwindow, plotter=None):
     sub_b3 = ZBTbutton(master=analysis.sub_top, text='Edit', command=lambda: edit_file(analysis, var.get()))
     sub_b3.grid(row=2, column=0, sticky='news', padx=10, pady=10)
 
-    ttk.Style().configure('Treeview', bg='blue', fg='green', fieldbackground='red')
+    style = ttk.Style()
+    style.theme_use('default')
+    style.configure('Treeview', background='silver', foreground='#0063b4', rowheight=25, fieldbackground='silver')
+    style.configure('Treeview.Heading', font=('Arial', 8, 'bold'), background='steelblue')
+    style.map('Treeview', background=[('selected', 'blue')])
 
-    data_table = ttk.Treeview(master=analysis.sub_left, columns=(0, 1, 2, 3, 4), show='headings', height=5)
-    data_table.column(0, width=60)
-    data_table.column(1, width=60, anchor='e')
-    data_table.column(2, width=60, anchor='e')
-    data_table.column(3, width=60, anchor='e')
-    data_table.column(4, width=60, anchor='e')
-    data_table.grid(row=1, column=2, sticky='news', padx=10, pady=10)
+    columns = list(range(10))
+    data_table = ttk.Treeview(master=analysis.sub_top, columns=columns, show='headings', height=5)
+    data_table.tag_configure('odd', background='grey30')
+    data_table.tag_configure('even', background='grey50')
+    for i in columns:
+        data_table.column(i, width=60, anchor='e')
+
+    data_table.grid(row=1, column=2, rowspan=3, sticky='news', padx=10, pady=10)
 
     # df_lib = pd.read_csv('database/database_poldata/poldata.csv', delimiter='\t')
     # measurement_name = df_lib['sample'].unique()
@@ -200,8 +205,6 @@ def buttonevent(subwindow, plotter=None):
                                                                                         fig_ax1, fig_ax2, data_table))
 
     option.grid(row=0, column=2, columnspan=6, sticky='ew', padx=10, pady=10)
-
-
 
     #plotter
     plotter_fig = Figure()
@@ -262,11 +265,11 @@ def buttonevent(subwindow, plotter=None):
         samples, dates, areas, flow_c, flow_a, temp = ['sample'], ['date'], ['area'], ['flow_c'], ['flow_a'], ['temp']
 
         i = 1
-        #data_table.heading(column=0, text='sample')
+        data_table.heading(column=0, text='sample')
 
         for key, value in plot_dict.items():
             print(key)
-            # data_table.heading(column=i, text=value[0][10:-2])
+            data_table.heading(column=i, text=value[0])
             i += 1
 
             samples.append(value[0])
@@ -276,19 +279,14 @@ def buttonevent(subwindow, plotter=None):
             flow_a.append(value[4])
             temp.append(value[5])
 
-        data_table.insert('', 'end', values=samples, tags=('odd'))
-        data_table.insert('', 'end', values=dates)
-        data_table.insert('', 'end', values=areas)
-        data_table.insert('', 'end', values=flow_c)
-        data_table.insert('', 'end', values=flow_a)
-        data_table.insert('', 'end', values=temp)
-        data_table.insert('', 'end', values=('add. info', ''))
-
-        # TODO:
-        data_table.tag_configure('odd', background='#008001')
+        data_table.insert('', 'end', values=dates, tag=('odd',))
+        data_table.insert('', 'end', values=areas, tag=('even',))
+        data_table.insert('', 'end', values=flow_c, tag=('odd',))
+        data_table.insert('', 'end', values=flow_a, tag=('even',))
+        data_table.insert('', 'end', values=temp, tag=('odd',))
+        data_table.insert('', 'end', values=('add. info', ''), tag=('even',))
 
         canvas.draw()
-
 
     analysis.mainloop()
 
