@@ -82,39 +82,37 @@ class ZBTwindow(tk.Tk):
 
 class ZBTtoplevel(tk.Toplevel):
 
-    def __init__(self, name, rows, columns, x_dim=1000, y_dim=800, canvas=False, *args, **kwargs):
+    def __init__(self, name, rows, columns, x_dim=1250, y_dim=1000, canvas=False, *args, **kwargs):
         tk.Toplevel.__init__(self, *args, **kwargs)
         self.config(bg='grey20')
         self.title(name)
         self.geometry('{}x{}'.format(x_dim, y_dim))
         self.iconbitmap('zbt_logo.ico')
 
-        self.columnconfigure(0, weight=1)
-        self.columnconfigure(1, weight=1)
-        self.columnconfigure(2, weight=1)
-        self.columnconfigure(3, weight=1)
+        col = 10
+        for i in range(col):
+            self.columnconfigure(i, weight=1)
 
-        self.rowconfigure(0, weight=1)
-        self.rowconfigure(1, weight=1)
-
-
+        row = 2
+        for i in range(row):
+            self.rowconfigure(i, weight=1)
 
         if canvas is True:
 
             self.rowconfigure(2, weight=1)
             self.sub_top = ZBTframe(rows, columns, height=(y_dim-20)/4*1, width=x_dim, master=self)
             self.sub_top.grid_propagate(0)
-            self.sub_left = ZBTframe(rows, 2, height=(y_dim-20)/4*3, width=x_dim/5*1, master=self)
+            self.sub_left = ZBTframe(rows, 3, master=self)
             self.sub_left.grid_propagate(0)
-            self.sub_canvas = ZBTframe(rows, 8, height=(y_dim-20)/4*3, width=x_dim/5*4, master=self, bg='blue')
+            self.sub_canvas = ZBTframe(rows, 10, width=x_dim, master=self, bg='blue')
             self.sub_canvas.grid_propagate(0)
             self.sub_bot = ZBTframe(1, 1, height=20, width=x_dim, bg='grey25', master=self)
             self.sub_bot.grid_propagate(0)
 
-            self.sub_top.grid(row=0, column=0, columnspan=4, sticky='news')
-            self.sub_left.grid(row=1, column=0, sticky='news')
-            self.sub_canvas.grid(row=1, column=1, columnspan=3, sticky='news')
-            self.sub_bot.grid(row=2, column=0, columnspan=4, sticky='news')
+            self.sub_top.grid(row=0, column=0, columnspan=10, sticky='news')
+            self.sub_left.grid(row=1, column=0, sticky='ns')
+            self.sub_canvas.grid(row=1, column=1, columnspan=9, sticky='news')
+            self.sub_bot.grid(row=2, column=0, columnspan=10, sticky='ew')
 
         else:
             self.sub_top = ZBTframe(rows, columns, height=(y_dim - 20), width=x_dim, master=self)
@@ -185,12 +183,23 @@ def buttonevent(subwindow, plotter=None):
     style.configure('Treeview.Heading', font=('Arial', 8, 'bold'), background='steelblue')
     style.map('Treeview', background=[('selected', 'blue')])
 
-    columns = list(range(10))
+    columns = list(range(7))
     data_table = ttk.Treeview(master=analysis.sub_top, columns=columns, show='headings', height=5)
     data_table.tag_configure('odd', background='grey30')
     data_table.tag_configure('even', background='grey50')
+
     for i in columns:
-        data_table.column(i, width=60, anchor='e')
+        data_table.column(i, width=100, anchor='e')
+
+    data_table.column(6, width=300, anchor='e')
+
+    data_table.heading(column=0, text='Sample')
+    data_table.heading(column=1, text='Date')
+    data_table.heading(column=2, text='Area [cm²]')
+    data_table.heading(column=3, text='c_flow [ml/min]')
+    data_table.heading(column=4, text='a_flow [ml/min')
+    data_table.heading(column=5, text='Temp. [°C]')
+    data_table.heading(column=6, text='Add. Info')
 
     data_table.grid(row=1, column=2, rowspan=3, sticky='news', padx=10, pady=10)
 
@@ -265,26 +274,19 @@ def buttonevent(subwindow, plotter=None):
         samples, dates, areas, flow_c, flow_a, temp = ['sample'], ['date'], ['area'], ['flow_c'], ['flow_a'], ['temp']
 
         i = 1
-        data_table.heading(column=0, text='sample')
+
 
         for key, value in plot_dict.items():
             print(key)
             data_table.heading(column=i, text=value[0])
             i += 1
 
-            samples.append(value[0])
-            dates.append(value[1])
-            areas.append(value[2])
-            flow_c.append(value[3])
-            flow_a.append(value[4])
-            temp.append(value[5])
+            sampledata = [value[0], value[1], value[2], value[3], value[4], value[5]]
 
-        data_table.insert('', 'end', values=dates, tag=('odd',))
-        data_table.insert('', 'end', values=areas, tag=('even',))
-        data_table.insert('', 'end', values=flow_c, tag=('odd',))
-        data_table.insert('', 'end', values=flow_a, tag=('even',))
-        data_table.insert('', 'end', values=temp, tag=('odd',))
-        data_table.insert('', 'end', values=('add. info', ''), tag=('even',))
+            if i % 2 == 0:
+                data_table.insert('', 'end', values=sampledata, tag=('even',))
+            else:
+                data_table.insert('', 'end', values=sampledata, tag=('odd',))
 
         canvas.draw()
 
