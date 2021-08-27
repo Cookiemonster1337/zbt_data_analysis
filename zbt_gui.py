@@ -106,6 +106,11 @@ class ZBTtoplevel(tk.Toplevel):
         self.sub_foot_l = tk.Label(self.sub_bot, text=subtext, bg='grey25', fg='snow')
         self.sub_foot_l.grid(row=0, column=0, sticky='w')
 
+    def set_file(self, file):
+        filename = file.split('/')[-1][:-4]
+        self.sub_foot_l = tk.Label(self.sub_bot, text=filename, bg='grey25', fg='snow')
+        self.sub_foot_l.grid(row=0, column=0, sticky='w')
+
 
 class ZBTlabel(tk.Label):
 
