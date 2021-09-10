@@ -31,7 +31,8 @@ client = MongoClient('172.16.134.6')
 db = client.testDB
 
 # reference collection, if not existent it will be created
-current_collection = db['NMT_TestCollection']
+#current_collection = db['NMT_TestCollection']
+current_collection = db['MaxCoat_61906']
 
 # authentication within database
 db.authenticate('mdb_LFD', 'zbtMongo!', source='testDB')
@@ -177,7 +178,6 @@ def buttonevent_pol(subwindow, plotter=None):
 
         i = 1
 
-        print(plot_dict)
         for key, value in plot_dict.items():
             i += 1
 
@@ -1028,7 +1028,7 @@ def buttonevent_ecr(subwindow):
     style.configure('Treeview.Heading', font=('Arial', 8, 'bold'), background='steelblue')
     style.map('Treeview', background=[('selected', 'blue')])
 
-    columns = list(range(10))
+    columns = list(range(9))
     data_table = ttk.Treeview(master=analysis.sub_top, columns=columns, show='headings', height=5)
     data_table.tag_configure('odd', background='grey30')
     data_table.tag_configure('even', background='grey50')
@@ -1042,9 +1042,11 @@ def buttonevent_ecr(subwindow):
     data_table.heading(column=1, text='Date')
     data_table.heading(column=2, text='Mode')
     data_table.heading(column=3, text='GDL')
-    data_table.heading(column=4, text='Area [cm²]')
-    data_table.heading(column=5, text='cycles [#]')
-    data_table.heading(column=6, text='Add. Info')
+    data_table.heading(column=4, text='thickness')
+    data_table.heading(column=5, text='Area [cm²]')
+    data_table.heading(column=6, text='cycle [#]')
+    data_table.heading(column=7, text='cycles')
+    data_table.heading(column=8, text='Add. Info')
 
     data_table.grid(row=1, column=2, rowspan=3, sticky='news', padx=10, pady=10)
 
@@ -1099,10 +1101,9 @@ def buttonevent_ecr(subwindow):
             try:
                 entry = current_collection.find_one({'measurement': 'ECR', 'name': i[10:-2]}, {'_id': 0})
                 ecr_data = pd.DataFrame.from_dict(entry.get('ecr_data'))
-                table_data = [entry.get('name'), entry.get('date'), entry.get('area [cm^2]'), \
-                              entry.get('flowrate_cathode [ml/min]'), entry.get('flowrate_anode [ml/min]'), \
-                              entry.get('temperature [°C]'), entry.get('current'), entry.get('signal ampl.'),
-                              entry.get('voltage'), entry.get('mode')]
+                table_data = [entry.get('name'), entry.get('date'), entry.get('area [cm^2]'), entry.get('thickness'),
+                              entry.get('mode'), entry.get('gdl'), entry.get('cycle#'), entry.get('cycles'),
+                              entry.get('add_info')]
 
             except:
                 ecr_data = pd.read_csv('database/database_eisdata/' + i, delimiter='\t')
@@ -1138,16 +1139,18 @@ def buttonevent_ecr(subwindow):
         i = 1
 
         for key, value in plot_dict.items():
-            data_table.heading(column=i, text=value[0])
             i += 1
 
-            sampledata = [value[0], value[1], value[2], value[3], value[4], value[5], value[6], value[8], value[7],
-                          value[9]]
+            # table_data = [entry.get('name'), entry.get('date'), entry.get('area [cm^2]'), entry.get('thickness'),
+            #               entry.get('mode'), entry.get('gdl'), entry.get('gdl_age'), entry.get('add_info')]
+
+            sampledata = [value[0], value[1], value[4], value[5], value[3], value[2], value[6], value[7], value[8]]
 
             if i % 2 == 0:
                 data_table.insert('', 'end', values=sampledata, tag=('even',))
             else:
                 data_table.insert('', 'end', values=sampledata, tag=('odd',))
+
 
         canvas.draw()
 
@@ -1163,7 +1166,6 @@ def import_ecrdata(file):
     df_ecr = pd.read_csv(file, sep='\t', decimal=',', encoding='cp1252', error_bad_lines=False)
 
     pd.set_option('display.max_columns', None)
-    print(df_ecr)
 
     ecr_specs_date = df_ecr.iloc[1]['Datum']
     ecr_specs_time = df_ecr.iloc[1]['Uhrzeit']
@@ -1232,7 +1234,7 @@ def import_ecrdata(file):
     l02_ecr_imp = ZBTlabel(master=ecr_import.sub_top, font_size=10, text='[dd.mm.yyyy]')
     l02_ecr_imp.grid(row=4, column=2, sticky='nws')
 
-    l06_ecr_imp = ZBTlabel(master=ecr_import.sub_top, font_size=10, text='[cm]')
+    l06_ecr_imp = ZBTlabel(master=ecr_import.sub_top, font_size=10, text='[mm]')
     l06_ecr_imp.grid(row=8, column=2, sticky='nws')
 
     l07_ecr_imp = ZBTlabel(master=ecr_import.sub_top, font_size=10, text='[cm^2]')
@@ -1290,7 +1292,6 @@ def data_check_ecr(frame, file, e1, e2, e5, e6, e7, e10, var, var_2):
         save_ecrdata(file, frame, entries)
 
 def save_ecrdata(file, frame, entries):
-    print(entries)
     df_ecr = pd.read_csv(file, sep='\t', decimal=',', encoding='cp1252', error_bad_lines=False)
 
     df_ecr = pd.read_csv(file, sep='\t', decimal=',', encoding='cp1252')
@@ -1317,7 +1318,7 @@ def save_ecrdata(file, frame, entries):
     df_ecr = df_ecr.iloc[:, :-1]
 
     sample_thickness = 'sample_thickness[cm]'
-    df_ecr.insert(len(df_ecr.columns), sample_thickness, int(entries['thickness']))
+    df_ecr.insert(len(df_ecr.columns), sample_thickness, float(entries['thickness'])/10)
 
     # Messzyklus
     cycle = 'cycle'
@@ -1481,12 +1482,15 @@ def save_ecrdata(file, frame, entries):
 
     no_cyc = int(entries['gdl_age'])
 
+    meas_currents = np.unique(df_ecr['current_rounded[mA]'].to_numpy(dtype=int))
+    meas_pressures = np.unique(df_ecr['pressure_rounded[bar]'].to_numpy(dtype=int))
+
     for index, row in df_ecr.iterrows():
 
         current = row['current_rounded[mA]']
         pressure = row['pressure_rounded[bar]']
 
-        if current < 600 and pressure < 3:
+        if current == min(meas_currents) and pressure == min(meas_pressures):
             no_cyc += 1
 
         df_ecr.loc[index, 'cycle'] = no_cyc
@@ -1495,15 +1499,12 @@ def save_ecrdata(file, frame, entries):
     pressures = np.unique(pressure_rounded.to_numpy(dtype=int))
     cycles = np.unique(df_ecr['cycle'].to_numpy(dtype=int))
 
-    print(measurements)
-    print(pressures)
-    print(cycles)
-
     df_h23 = pd.read_csv('h23_reference.csv', sep='\t')
 
     pressure_ref = [1, 2, 3, 5, 6, 9, 10, 12, 15, 18, 20, 21, 24, 27, 30]
-
+    print(df_ecr)
     for c in cycles:
+
         gdl_cycle = df_h23['cycle'] == c
         data_cycle = df_ecr['cycle'] == c
 
@@ -1522,6 +1523,7 @@ def save_ecrdata(file, frame, entries):
             gdl_as_corr = df_h23[gdl_cycle & gdl_pressure]['as_main_resistance[mOhm*cm2]'].mean()
             df_ecr.loc[data_cycle & data_pressure, corr] = gdl_corr
             df_ecr.loc[data_cycle & data_pressure, as_corr] = gdl_as_corr
+
     # seperate datafile into different measurements
     for m in measurements:
 
@@ -1532,7 +1534,7 @@ def save_ecrdata(file, frame, entries):
         #     df_ecr.insert(2, 'measurement', id, True)
 
         for c in cycles:
-
+            print('calculating_data cycles: ' + str(c) + '/' + str(max(cycles)))
             data_cycle = df_ecr['cycle'] == c
 
             for p in pressures:
@@ -1594,10 +1596,8 @@ def save_ecrdata(file, frame, entries):
                 if entries['mode'] == 'yes':
                     res_bulk = df['voltage_needle_th[mV]'] / df['current[mA]'] * 1000
                 else:
-                    res_bulk = 0
+                    res_bulk = df['voltage_needle_th[mV]'] * 0
 
-                print(entries['mode'])
-                print(res_bulk)
                 res_bulk_mean = res_bulk.mean()
                 res_bulk_error = res_bulk.sem()
                 res_bulk_as = res_bulk * df['contact_area[cm2]']
@@ -1635,12 +1635,13 @@ def save_ecrdata(file, frame, entries):
                 df_ecr.loc[data_cycle & data_pressure, res_contact_as_mean_col] = res_contact_as_mean
                 df_ecr.loc[data_cycle & data_pressure, res_contact_as_error_col] = res_contact_as_error
 
-    print(df_ecr[(df_ecr['cycle'] == 20) & (df_ecr['pressure_rounded[bar]'] == 20)])
 
     ecr_data_dict = df_ecr.to_dict('records')
     db_data_dict = {'measurement': 'ECR', "name": entries['sample'], 'mode': entries['mode'], 'gdl': entries['gdl'],
                     'date': entries['date'], 'add_info': entries['opt_info'], 'area [cm^2]': entries['area'],
-                    'thickness': entries['thickness'], 'ecr_data': ecr_data_dict}
+                    'thickness': entries['thickness'], 'cycle#': entries['gdl_age'], 'cycles': len(cycles),
+                    'ecr_data': ecr_data_dict}
+
 
     try:
         current_collection.insert_one(db_data_dict)
@@ -1675,9 +1676,9 @@ def verify_ecr_import(df_ecr, entries):
     a[0][0].set_title('Main-Resistance')
     a[0][0].set_xlabel('pressure [bar]')
     a[0][0].set_ylabel('resistance [mOhm*cm^2]')
-    a[0][0].set_xticks(range(0, 31, 5))
+    #a[0][0].set_xticks(range(0, 31, 5))
     a[0][0].xaxis.set_minor_locator(AutoMinorLocator())
-    a[0][0].set_yticks(ticks=range(0, int(y_values.max()) + 5, 10))
+    #a[0][0].set_yticks(range(0, int(y_values.max()) + 5, int(y_values.max() / 10)))
     a[0][0].yaxis.set_minor_locator(AutoMinorLocator())
     a[0][0].grid()
     a[0][0].legend(loc='best')
@@ -1769,8 +1770,8 @@ def verify_ecr_import(df_ecr, entries):
     a[0][2].set_title('Resistances')
     a[0][2].set_xlabel('pressure [bar]')
     a[0][2].set_ylabel('resistance [mOhm*cm^2]')
-    a[0][2].set_xticks(range(0, max(x_values), 5))
-    a[0][2].set_yticks(range(0, int(max(y_values_main)) + 5, 5))
+    #a[0][2].set_xticks(range(0, max(x_values), 5))
+    #a[0][2].set_yticks(range(0, int(max(y_values_main)) + 5, int(y_values.max() / 10)))
     a[0][2].grid()
     a[0][2].legend(loc='best')
 
