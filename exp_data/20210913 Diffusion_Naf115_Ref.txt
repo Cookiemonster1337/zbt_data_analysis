@@ -1,0 +1,58 @@
+Datum: 13.09.2021
+Probe: 5 cm² Nafion 115 Ref mit Kat: 1,5mg/cm² Pt jeweils A+K
+Heizbad: 72 °C --> 65 °C in Zelle
+Anpressdruck Zelle: 0,6 bar
+Luftversorgung über Ringleitung
+
+
+Zelle: 5 cm² Graphit-Compound-Platten in Original Baltic Zelle
+Anode: 5-molare Methanol-Lösung
+Kathode: Dest. Wasser
+Flow Methanol und Wasser: 5.0 (--> 1 ml/min)
+Anode: Loop
+Kathode kein Loop
+
+
+t=0  13:40 Uhr; Gewicht Methanol: -19,5 g; Sensor: 0,496 V
+
+Uhrzeit	m [g]		U [V]
+
+14:25		-19,67	0,496
+15:10		-19,33	0,496
+15:33		-19,21	3,5
+15:35		-19,19	4,2
+15:41		-19,07	4,46 (max. --> = 10% MeOH)
+
+nach dem leerpumpen (ca 1 h abkühlen gelassen)
+-1,23g
+
+am 14.9 
+UI Kennlinie
+
+0,2 l/min Luft
+1ml/min Methanol
+72 T_soll
+5mol
+Graphenfowfield statt Titan verwendet
+
+ocv:0,57
+
+I	U
+0,4	0,28
+0,3	0,31
+0,2	0,35
+0,1	0,36
+0	0,45
+
+Spannung schwankt sehr stark während der Messung
+
+
+
+Methanol flowrate auf 2 ml/min erhöht
+keine Verbesserung
+zurück auf 1 ml/min
+
+
+PEIS: 94 mOHm  10mV 40KHz  0,2°  ocv
+
+GEIS bei 0,1 A

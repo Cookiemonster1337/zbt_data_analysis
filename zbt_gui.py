@@ -51,9 +51,13 @@ class ZBTwindow(tk.Tk):
 
         self.footnote = 'Ver.: ' + str(version) + ' (' + str(year) + ') by ' + \
                         author
-        self.foot = tk.Label(self.bot, text=self.footnote, bg='grey25',
+        self.sub_foot_r = tk.Label(self.bot, text=self.footnote, bg='grey25',
                              fg='snow')
-        self.foot.grid(row=0, column=0, sticky='e')
+        self.sub_foot_r.grid(row=0, column=0, sticky='e')
+
+    def set_dbstatus(self, subtext, color):
+        self.sub_foot_l = tk.Label(self.bot, text=subtext, bg='grey25', fg=color)
+        self.sub_foot_l.grid(row=0, column=0, sticky='w')
 
 class ZBTtoplevel(tk.Toplevel):
 
@@ -77,16 +81,16 @@ class ZBTtoplevel(tk.Toplevel):
             self.rowconfigure(2, weight=1)
             self.sub_top = ZBTframe(rows, columns, height=(y_dim-20)/4*1, width=x_dim, master=self)
             self.sub_top.grid_propagate(0)
-            self.sub_left = ZBTframe(rows, 3, master=self)
-            self.sub_left.grid_propagate(0)
+            # self.sub_left = ZBTframe(rows, 3, master=self)
+            # self.sub_left.grid_propagate(0)
             self.sub_canvas = ZBTframe(rows, 10, width=x_dim, master=self, bg='blue')
             self.sub_canvas.grid_propagate(0)
             self.sub_bot = ZBTframe(1, 1, height=20, width=x_dim, bg='grey25', master=self)
             self.sub_bot.grid_propagate(0)
 
             self.sub_top.grid(row=0, column=0, columnspan=10, sticky='news')
-            self.sub_left.grid(row=1, column=0, sticky='ns')
-            self.sub_canvas.grid(row=1, column=1, columnspan=9, sticky='news')
+            # self.sub_left.grid(row=1, column=0, sticky='ns')
+            self.sub_canvas.grid(row=1, column=0, columnspan=10, sticky='news')
             self.sub_bot.grid(row=2, column=0, columnspan=10, sticky='ew')
 
         else:
@@ -102,15 +106,14 @@ class ZBTtoplevel(tk.Toplevel):
         self.sub_foot_r = tk.Label(self.sub_bot, text=self.sub_footnote, bg='grey25', fg='snow')
         self.sub_foot_r.grid(row=0, column=0, sticky='e')
 
-    def set_dbstatus(self, subtext):
-        self.sub_foot_l = tk.Label(self.sub_bot, text=subtext, bg='grey25', fg='snow')
+    def set_dbstatus(self, subtext, color):
+        self.sub_foot_l = tk.Label(self.sub_bot, text=subtext, bg='grey25', fg=color)
         self.sub_foot_l.grid(row=0, column=0, sticky='w')
 
     def set_file(self, file):
         filename = file.split('/')[-1][:-4]
         self.sub_foot_l = tk.Label(self.sub_bot, text=filename, bg='grey25', fg='snow')
         self.sub_foot_l.grid(row=0, column=0, sticky='w')
-
 
 class ZBTlabel(tk.Label):
 

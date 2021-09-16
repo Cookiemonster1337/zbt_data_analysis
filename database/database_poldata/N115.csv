@@ -1,0 +1,6 @@
+sample	date	info	current [A]	voltage [V]	area [cm^2]	flow_rate_C [l/min]	flow_rate_A [l/min]	Temperature [Cel.]	current density [A/cm^2]	power [W]	power density [W/cm^2]
+N115	15.09.2021	DMFC-5M; Cat-Target-A 1.5mgPt/cm²	0.4	0.33	5	200	1	65	0.08	0.132	0.026400000000000003
+N115	15.09.2021	DMFC-5M; Cat-Target-A 1.5mgPt/cm²	0.3	0.36	5	200	1	65	0.06	0.108	0.021599999999999998
+N115	15.09.2021	DMFC-5M; Cat-Target-A 1.5mgPt/cm²	0.2	0.4	5	200	1	65	0.04	0.08000000000000002	0.016
+N115	15.09.2021	DMFC-5M; Cat-Target-A 1.5mgPt/cm²	0.1	0.41	5	200	1	65	0.02	0.041	0.008199999999999999
+N115	15.09.2021	DMFC-5M; Cat-Target-A 1.5mgPt/cm²	0.0	0.5	5	200	1	65	0.0	0.0	0.0

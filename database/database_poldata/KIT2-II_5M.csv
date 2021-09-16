@@ -1,0 +1,6 @@
+sample	date	info	current [A]	voltage [V]	area [cm^2]	flow_rate_C [l/min]	flow_rate_A [l/min]	Temperature [Cel.]	current density [A/cm^2]	power [W]	power density [W/cm^2]
+KIT2-II_5M	16.09.2021	P:G-3:1	0.4	0.247	5	200	1	65	0.08	0.0988	0.01976
+KIT2-II_5M	16.09.2021	P:G-3:1	0.3	0.27	5	200	1	65	0.06	0.081	0.0162
+KIT2-II_5M	16.09.2021	P:G-3:1	0.2	0.297	5	200	1	65	0.04	0.0594	0.01188
+KIT2-II_5M	16.09.2021	P:G-3:1	0.1	0.335	5	200	1	65	0.02	0.0335	0.0067
+KIT2-II_5M	16.09.2021	P:G-3:1	0.0	0.599	5	200	1	65	0.0	0.0	0.0

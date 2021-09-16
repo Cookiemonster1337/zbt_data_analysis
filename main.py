@@ -16,6 +16,13 @@ import warnings
 from zbt_gui import ZBTframe, ZBTbutton, ZBTtoplevel, ZBTwindow, ZBTfont, ZBTentry, ZBTlabel
 from datetime import datetime
 from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
+import threading
+from openpyxl import load_workbook
+import pathlib
+
+from openpyxl.chart import ScatterChart, LineChart, Reference, Series
+
+
 
 matplotlib.use('TkAgg')
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -37,14 +44,20 @@ current_collection = db['MaxCoat_61906']
 # authentication within database
 db.authenticate('mdb_LFD', 'zbtMongo!', source='testDB')
 
-
 # GUI - mainwindow
 main = ZBTwindow('Data Analysis', rows=10, columns=3)
 # rootpath = Path('C:/Users/inrel/Desktop/database/')
 rootpath = Path('data/database/')
+
 plot_list = []
 plot_df = []
 plot_dict = {}
+
+try:
+    files = current_collection.find({'measurement': 'POL'}, {'_id': 0, 'name': 1})
+    main.set_dbstatus('PyMongo Status: Connected', 'green')
+except NameError:
+    main.set_dbstatus('PyMongo Status: Disconnected', 'red')
 
 #POL
 def buttonevent_pol(subwindow, plotter=None):
@@ -89,10 +102,10 @@ def buttonevent_pol(subwindow, plotter=None):
     data_table.grid(row=1, column=2, rowspan=3, sticky='news', padx=10, pady=10)
 
     try:
-        analysis.set_dbstatus('PyMongo Status: Connected')
+        analysis.set_dbstatus('PyMongo Status: Connected', 'green')
         files = current_collection.find({'measurement': 'POL'}, {'_id': 0, 'name': 1})
     except NameError:
-        analysis.set_dbstatus('PyMongo Status: Disconnected')
+        analysis.set_dbstatus('PyMongo Status: Disconnected', 'red')
         df_lib = pd.read_csv('database/database_poldata/poldata.csv', delimiter='\t')
         measurement_name = df_lib['sample'].unique()
         files = [x for x in os.listdir('database/database_poldata/') if x.endswith(".csv")]
@@ -233,10 +246,10 @@ def import_poldata(file):
     l03_pol_imp = ZBTlabel(master=pol_import.sub_top, font_size=16, text='cm²')
     l03_pol_imp.grid(row=5, column=2, sticky='nes')
 
-    l04_pol_imp = ZBTlabel(master=pol_import.sub_top, font_size=16, text='l/min')
+    l04_pol_imp = ZBTlabel(master=pol_import.sub_top, font_size=16, text='ml/min')
     l04_pol_imp.grid(row=6, column=2, sticky='nes')
 
-    l05_pol_imp = ZBTlabel(master=pol_import.sub_top, font_size=16, text='l/min')
+    l05_pol_imp = ZBTlabel(master=pol_import.sub_top, font_size=16, text='ml/min')
     l05_pol_imp.grid(row=7, column=2, sticky='nes')
 
     l06_pol_imp = ZBTlabel(master=pol_import.sub_top, font_size=16, text='°C')
@@ -458,11 +471,18 @@ def export_pol_graph(plot_list):
     ax2 = ax.twinx()
     ax2.set_ylabel('Power [W]')
 
+    rootpath = pathlib.Path(__file__).parent.absolute()
+    wb_path = str(rootpath) + '/data/export.xlsx'
+    book = load_workbook(wb_path)
+    writer = pd.ExcelWriter(wb_path, engine='openpyxl')
+    writer.book = book
 
+    # writer = pd.ExcelWriter('test.xlsx', engine='xlsxwriter')
     for i in plot_list:
         try:
             entry = current_collection.find_one({'name': i[10:-2], 'measurement': 'POL'}, {'_id': 0})
             pol_data = pd.DataFrame.from_dict(entry.get('pol_data'))
+            # pol_data.to_excel(writer, sheet_name='Sheet1')
             table_data = [entry.get('name'), entry.get('date'), entry.get('area [cm^2]'), \
                           entry.get('flowrate_cathode [ml/min]'), entry.get('flowrate_anode [ml/min]'), \
                           entry.get('temperature [°C]')]
@@ -479,8 +499,36 @@ def export_pol_graph(plot_list):
         plt1 = ax.plot(x_values, y_values, 's--', label=str(i[:-4]))
         ax2.plot(x_values, y2_values, 's--', color=plt1[0].get_color())
 
+        sheetname = i[10:-2]
+        pol_data.to_excel(writer, sheet_name=sheetname, index=False)
+
+        sheet = book[sheetname]
+
+
+
+        chart = ScatterChart()
+        chart.title = 'POL-Curve'
+        chart.x_axis.title = 'current [mA/cm2]'
+        chart.y_axis.title = 'voltage [V]'
+
+
+        x_xlsx = Reference(sheet, min_col=4, min_row=1, max_col=4, max_row=20)
+        y_xlsx = Reference(sheet, min_col=2, min_row=1, max_col=2, max_row=20)
+        series = Series(y_xlsx, x_xlsx)
+        chart.series.append(series)
+
+        sheet.add_chart(chart)
+
+    writer.save()
+    writer.close()
+
+    # worksheet = writer.sheets['Sheet1']
+    # worksheet.insert_image('C2', 'pol-curve.png')
+    # writer.save()
+
     ax.legend(loc='best')
     plt.show()
+
 
 
 #EIS
@@ -529,10 +577,10 @@ def buttonevent_eis(subwindow):
     data_table.grid(row=1, column=2, rowspan=3, sticky='news', padx=10, pady=10)
 
     try:
-        analysis.set_dbstatus('PyMongo Status: Connected')
+        analysis.set_dbstatus('PyMongo Status: Connected', 'green')
         eis_files = current_collection.find({'measurement': 'EIS'}, {'_id': 0, 'name': 1})
     except NameError:
-        analysis.set_dbstatus('PyMongo Status: Disconnected')
+        analysis.set_dbstatus('PyMongo Status: Disconnected', 'red')
         df_lib = pd.read_csv('database/database_eisdata/eisdata.csv', delimiter='\t')
         measurement_name = df_lib['sample'].unique()
         eis_files = [x for x in os.listdir('database/database_eisdata/') if x.endswith(".csv")]
@@ -1005,10 +1053,9 @@ def export_eis_graph(plot_list):
 
     ax.legend(loc='best')
 
-
 #ECR
 def buttonevent_ecr(subwindow):
-    analysis = ZBTtoplevel(master=main, canvas=True, x_dim=1500, name=subwindow, rows=10, columns=10)
+    analysis = ZBTtoplevel(master=main, canvas=True, x_dim=1800, y_dim=1200, name=subwindow, rows=10, columns=10)
 
     sub_b1 = ZBTbutton(master=analysis.sub_top, text='Import', command=lambda: get_ecr_file(analysis))
     sub_b1.grid(row=0, column=0, sticky='news', padx=10, pady=10)
@@ -1051,10 +1098,10 @@ def buttonevent_ecr(subwindow):
     data_table.grid(row=1, column=2, rowspan=3, sticky='news', padx=10, pady=10)
 
     try:
-        analysis.set_dbstatus('PyMongo Status: Connected')
+        analysis.set_dbstatus('PyMongo Status: Connected', 'green')
         ecr_files = current_collection.find({'measurement': 'ECR'}, {'_id': 0, 'name': 1})
     except NameError:
-        analysis.set_dbstatus('PyMongo Status: Disconnected')
+        analysis.set_dbstatus('PyMongo Status: Disconnected', 'red')
         df_lib = pd.read_csv('database/database_ecrdata/ecrdata.csv', delimiter='\t')
         measurement_name = df_lib['sample'].unique()
         ecr_files = [x for x in os.listdir('database/database_ecrdata/') if x.endswith(".csv")]
@@ -1080,9 +1127,15 @@ def buttonevent_ecr(subwindow):
 
         plotter_fig.clear()
 
-        grid = plotter_fig.add_gridspec(10, 10)
+        grid = plotter_fig.add_gridspec(12, 11)
 
-        fig_ax1 = plotter_fig.add_subplot(grid[:10, :10])
+        fig_ax1 = plotter_fig.add_subplot(grid[:5, :3])
+        fig_ax2 = plotter_fig.add_subplot(grid[7:, :3])
+        fig_ax3 = plotter_fig.add_subplot(grid[:5, 4:7])
+        fig_ax4 = plotter_fig.add_subplot(grid[7:, 4:7])
+        fig_ax5 = plotter_fig.add_subplot(grid[:5, 8:])
+        fig_ax6 = plotter_fig.add_subplot(grid[7:, 8:])
+        #fig, a = plt.subplots(2, 2, figsize=(10, 10))
 
         fig_ax1.set_title('Contact-Resistance', pad=10, fontdict=dict(fontsize=18, weight='bold'))
         fig_ax1.set_xlabel('resistance [mOhm*cm²]')
@@ -1114,25 +1167,49 @@ def buttonevent_ecr(subwindow):
             measurements = np.unique(ecr_data['measurement'].to_numpy())
             pressures = np.unique(ecr_data['pressure_rounded[bar]'].to_numpy(dtype=int))
             cycles = np.unique(ecr_data['cycle'].to_numpy(dtype=int))
+            currents = np.unique(ecr_data['current_rounded[mA]'].to_numpy(dtype=int))
 
-            data_boxplot = []
-            y_values = []
+            data_boxplot_01 = []
+            y_values_01 = []
+
             for p in pressures:
                 data_pressure = ecr_data['pressure_rounded[bar]'] == p
-                data_boxplot.append(ecr_data[data_pressure]['as_contact_resistance[mOhm*cm2]'])
-                y_values.append(ecr_data[data_pressure]['as_contact_resistance[mOhm*cm2]'].mean())
 
-            fig_ax1.plot(pressures, y_values)
-            fig_ax1.boxplot(data_boxplot, positions=pressures)
+                data_boxplot_01.append(ecr_data[data_pressure]['as_contact_resistance[mOhm*cm2]'])
+                y_values_01.append(ecr_data[data_pressure]['as_contact_resistance[mOhm*cm2]'].mean())
+
+            fig_ax1.plot(pressures, y_values_01, label=i)
+
+            for i in currents:
+                y_values_02 = []
+                data_boxplot_02 = []
+                data_current = ecr_data['current_rounded[mA]'] == i
+
+                for p in pressures:
+                    data_pressure = ecr_data['pressure_rounded[bar]'] == p
+
+                    data_boxplot_02.append(ecr_data[data_pressure][data_current]['as_contact_resistance[mOhm*cm2]'])
+                    y_values_02.append(ecr_data[data_pressure][data_current]['as_contact_resistance[mOhm*cm2]'].mean())
+
+                fig_ax2.plot(pressures, y_values_02, label=i)
+                fig_ax2.boxplot(data_boxplot_02, positions=pressures)
+
+            fig_ax2.legend(loc='best')
+            fig_ax2.grid(True)
+            # fig_ax3.plot(pressures, y_values)
+            # fig_ax4.plot(pressures, y_values)
+            # fig_ax5.plot(pressures, y_values)
+            # fig_ax6.plot(pressures, y_values)
+            #fig_ax1.boxplot(data_boxplot, positions=pressures)
             fig_ax1.set_title('Contact-Resistance')
             fig_ax1.set_xlabel('pressure [bar]')
             fig_ax1.set_ylabel('resistance [mOhm*cm^2]')
             # a[1][2].set_xticks(range(0, max(x_values), 5))
             # a[1][2].set_yticks(range(0, int(max(data_boxplot[0])) + 5, 5))
-            fig_ax1.grid()
+            fig_ax1.grid(True)
 
             # fig_ax1.plot(x_values, y_values, 's-', label=str(i[:-4]))
-            # fig_ax1.legend(loc='best')
+            fig_ax1.legend(loc='best')
 
             plot_dict[i] = table_data
 
@@ -1177,7 +1254,6 @@ def import_ecrdata(file):
 
     ecr_import.set_file(file)
 
-    # TODO:date? , thickness?, area?
     # header
     l_head = ZBTlabel(master=ecr_import.sub_top, font_spec='header', font_size=16, text='ECR Data-Import')
     l_head.grid(row=0, column=0, columnspan=3, sticky='news')
@@ -1286,375 +1362,389 @@ def data_check_ecr(frame, file, e1, e2, e5, e6, e7, e10, var, var_2):
     entries = {'sample': e1,'date': e2,'thickness': e5,'area': e6, 'gdl_age': e7, 'opt_info': e10,'mode': var,
                'gdl': var_2}
 
+    progress = ZBTtoplevel('ECR-Data Import Progress', rows=3, columns=3, x_dim=400, y_dim=200)
+    pb = ttk.Progressbar(progress.sub_top, orient='horizontal', mode='determinate', length=200)
+    pb.pack(expand=True)
+
+
     if '' in entries.values():
         messagebox.showinfo(parent=frame, title="Data Error", message="Incomplete Data!!!")
     else:
-        save_ecrdata(file, frame, entries)
+        save_ecrdata(file, frame, entries, progress, pb)
+    progress.mainloop()
 
-def save_ecrdata(file, frame, entries):
-    df_ecr = pd.read_csv(file, sep='\t', decimal=',', encoding='cp1252', error_bad_lines=False)
+def save_ecrdata(file, frame, entries, progress, pb):
 
-    df_ecr = pd.read_csv(file, sep='\t', decimal=',', encoding='cp1252')
+    def real_save():
 
-    df_ecr.round(6)
+        df_ecr = pd.read_csv(file, sep='\t', decimal=',', encoding='cp1252', error_bad_lines=False)
 
-    df_ecr.rename(columns={df_ecr.iloc[0, 0]: 'date', 'Uhrzeit': 'time',
-                           'Kommentar': 'measurement',
-                           'p_Probe_Ist / bar': 'pressure_sample[bar]',
-                           'I_Ist / mA': 'current[mA]',
-                           'U_ges / mV': 'voltage[mV]',
-                           'U_Nadel / mV': 'voltage_needle[mV]',
-                           'U_ges-Th_U': 'voltage_th[mV]',
-                           'U_Nadel-Th_U': 'voltage_needle_th[mV]',
-                           'Anpressfläche / cm²': 'contact_area[cm2]',
-                           'p_Ist / bar': 'pressure[bar]',
-                           'p_Kraftsensor / ?': 'pressure_sensor'},
-                  inplace=True)
+        df_ecr = pd.read_csv(file, sep='\t', decimal=',', encoding='cp1252')
 
-    df_ecr = df_ecr[df_ecr['current[mA]'] != 0]
+        df_ecr.round(6)
 
-    df_ecr.fillna(0, inplace=True)
+        df_ecr.rename(columns={df_ecr.iloc[0, 0]: 'date', 'Uhrzeit': 'time',
+                               'Kommentar': 'measurement',
+                               'p_Probe_Ist / bar': 'pressure_sample[bar]',
+                               'I_Ist / mA': 'current[mA]',
+                               'U_ges / mV': 'voltage[mV]',
+                               'U_Nadel / mV': 'voltage_needle[mV]',
+                               'U_ges-Th_U': 'voltage_th[mV]',
+                               'U_Nadel-Th_U': 'voltage_needle_th[mV]',
+                               'Anpressfläche / cm²': 'contact_area[cm2]',
+                               'p_Ist / bar': 'pressure[bar]',
+                               'p_Kraftsensor / ?': 'pressure_sensor'},
+                      inplace=True)
 
-    df_ecr = df_ecr.iloc[:, :-1]
+        df_ecr = df_ecr[df_ecr['current[mA]'] != 0]
 
-    sample_thickness = 'sample_thickness[cm]'
-    df_ecr.insert(len(df_ecr.columns), sample_thickness, float(entries['thickness'])/10)
+        df_ecr.fillna(0, inplace=True)
 
-    # Messzyklus
-    cycle = 'cycle'
-    df_ecr.insert(len(df_ecr.columns), cycle, 0.0)
+        df_ecr = df_ecr.iloc[:, :-1]
 
-    pressure_rounded = df_ecr['pressure_sample[bar]'].round(decimals=0)
-    df_ecr.insert(4, column='pressure_rounded[bar]', value=pressure_rounded)
+        sample_thickness = 'sample_thickness[cm]'
+        df_ecr.insert(len(df_ecr.columns), sample_thickness, float(entries['thickness'])/10)
 
-    current_rounded = df_ecr['current[mA]'].round(decimals=-2)
-    df_ecr.insert(6, column='current_rounded[mA]', value=current_rounded)
+        # Messzyklus
+        cycle = 'cycle'
+        df_ecr.insert(len(df_ecr.columns), cycle, 0.0)
 
-    # spez. GDL-Korrektur
-    corr = 'degradation_corr[mOhm]'
-    df_ecr.insert(len(df_ecr.columns), corr, 0.0)
+        pressure_rounded = df_ecr['pressure_sample[bar]'].round(decimals=0)
+        df_ecr.insert(4, column='pressure_rounded[bar]', value=pressure_rounded)
 
-    as_corr = 'as_degradation_corr[mOhm*cm2]'
-    df_ecr.insert(len(df_ecr.columns), as_corr, 0.0)
+        current_rounded = df_ecr['current[mA]'].round(decimals=-2)
+        df_ecr.insert(6, column='current_rounded[mA]', value=current_rounded)
 
-    # Gesamtwiderstand
-    res_main_col = 'main_resistance[mOhm]'
-    df_ecr.insert(len(df_ecr.columns), res_main_col, 0.0)
+        # spez. GDL-Korrektur
+        corr = 'degradation_corr[mOhm]'
+        df_ecr.insert(len(df_ecr.columns), corr, 0.0)
 
-    res_main_mean_col = 'main_resistance_mean[mOhm]'
-    df_ecr.insert(len(df_ecr.columns), res_main_mean_col, 0.0)
+        as_corr = 'as_degradation_corr[mOhm*cm2]'
+        df_ecr.insert(len(df_ecr.columns), as_corr, 0.0)
 
-    res_main_error_col = 'main_resistance_error[mOhm]'
-    df_ecr.insert(len(df_ecr.columns), res_main_error_col, 0.0)
+        # Gesamtwiderstand
+        res_main_col = 'main_resistance[mOhm]'
+        df_ecr.insert(len(df_ecr.columns), res_main_col, 0.0)
 
-    # as-Gesamtwiderstand
-    res_main_as_col = 'as_main_resistance[mOhm*cm2]'
-    df_ecr.insert(len(df_ecr.columns), res_main_as_col, 0.0)
+        res_main_mean_col = 'main_resistance_mean[mOhm]'
+        df_ecr.insert(len(df_ecr.columns), res_main_mean_col, 0.0)
 
-    res_main_as_mean_col = 'as_main_resistance_mean[mOhm*cm2]'
-    df_ecr.insert(len(df_ecr.columns), res_main_as_mean_col, 0.0)
+        res_main_error_col = 'main_resistance_error[mOhm]'
+        df_ecr.insert(len(df_ecr.columns), res_main_error_col, 0.0)
 
-    res_main_as_error_col = 'as_main_resistance_error[mOhm*cm2]'
-    df_ecr.insert(len(df_ecr.columns), res_main_as_error_col, 0.0)
+        # as-Gesamtwiderstand
+        res_main_as_col = 'as_main_resistance[mOhm*cm2]'
+        df_ecr.insert(len(df_ecr.columns), res_main_as_col, 0.0)
 
-    # as-Durchgangswiderstand
-    res_through_as_col = 'as_flow_resistance[mOhm*cm2]'
-    df_ecr.insert(len(df_ecr.columns), res_through_as_col, 0.0)
+        res_main_as_mean_col = 'as_main_resistance_mean[mOhm*cm2]'
+        df_ecr.insert(len(df_ecr.columns), res_main_as_mean_col, 0.0)
 
-    res_through_as_mean_col = 'as_flow_resistance_mean[mOhm*cm2]'
-    df_ecr.insert(len(df_ecr.columns), res_through_as_mean_col, 0.0)
+        res_main_as_error_col = 'as_main_resistance_error[mOhm*cm2]'
+        df_ecr.insert(len(df_ecr.columns), res_main_as_error_col, 0.0)
 
-    res_through_as_error_col = 'as_flow_resistance_error[mOhm*cm2]'
-    df_ecr.insert(len(df_ecr.columns), res_through_as_error_col, 0.0)
+        # as-Durchgangswiderstand
+        res_through_as_col = 'as_flow_resistance[mOhm*cm2]'
+        df_ecr.insert(len(df_ecr.columns), res_through_as_col, 0.0)
 
-    # vs-Gesamtwiderstand
-    res_main_vs_col = 'vs_main_resistance[mOhm*cm]'
-    df_ecr.insert(len(df_ecr.columns), res_main_vs_col, 0.0)
+        res_through_as_mean_col = 'as_flow_resistance_mean[mOhm*cm2]'
+        df_ecr.insert(len(df_ecr.columns), res_through_as_mean_col, 0.0)
 
-    res_main_vs_mean_col = 'vs_main_resistance_mean[mOhm*cm]'
-    df_ecr.insert(len(df_ecr.columns), res_main_vs_mean_col, 0.0)
+        res_through_as_error_col = 'as_flow_resistance_error[mOhm*cm2]'
+        df_ecr.insert(len(df_ecr.columns), res_through_as_error_col, 0.0)
 
-    res_main_vs_error_col = 'vs_main_resistance_error[mOhm*cm]'
-    df_ecr.insert(len(df_ecr.columns), res_main_vs_error_col, 0.0)
+        # vs-Gesamtwiderstand
+        res_main_vs_col = 'vs_main_resistance[mOhm*cm]'
+        df_ecr.insert(len(df_ecr.columns), res_main_vs_col, 0.0)
 
-    # Durchgangswiderstand
-    res_through_col = 'flow_resistance[mOhm]'
-    df_ecr.insert(len(df_ecr.columns), res_through_col, 0.0)
+        res_main_vs_mean_col = 'vs_main_resistance_mean[mOhm*cm]'
+        df_ecr.insert(len(df_ecr.columns), res_main_vs_mean_col, 0.0)
 
-    res_through_mean_col = 'flow_resistance_mean[mOhm]'
-    df_ecr.insert(len(df_ecr.columns), res_through_mean_col, 0.0)
+        res_main_vs_error_col = 'vs_main_resistance_error[mOhm*cm]'
+        df_ecr.insert(len(df_ecr.columns), res_main_vs_error_col, 0.0)
 
-    res_through_error_col = 'flow_resistance_error[mOhm]'
-    df_ecr.insert(len(df_ecr.columns), res_through_error_col, 0.0)
+        # Durchgangswiderstand
+        res_through_col = 'flow_resistance[mOhm]'
+        df_ecr.insert(len(df_ecr.columns), res_through_col, 0.0)
 
-    # vs-Durchgangswiderstand
-    res_through_vs_col = 'vs_flow_resistance[mOhm*cm]'
-    df_ecr.insert(len(df_ecr.columns), res_through_vs_col, 0.0)
+        res_through_mean_col = 'flow_resistance_mean[mOhm]'
+        df_ecr.insert(len(df_ecr.columns), res_through_mean_col, 0.0)
 
-    res_through_vs_mean_col = 'vs_flow_resistance_mean[mOhm*cm]'
-    df_ecr.insert(len(df_ecr.columns), res_through_vs_mean_col, 0.0)
+        res_through_error_col = 'flow_resistance_error[mOhm]'
+        df_ecr.insert(len(df_ecr.columns), res_through_error_col, 0.0)
 
-    res_through_vs_error_col = 'vs_flow_resistance_error[mOhm*cm]'
-    df_ecr.insert(len(df_ecr.columns), res_through_vs_error_col, 0.0)
+        # vs-Durchgangswiderstand
+        res_through_vs_col = 'vs_flow_resistance[mOhm*cm]'
+        df_ecr.insert(len(df_ecr.columns), res_through_vs_col, 0.0)
 
-    # Bulkwiderstand
-    res_bulk_col = 'bulk_resistance[mOhm]'
-    df_ecr.insert(len(df_ecr.columns), res_bulk_col, 0.0)
+        res_through_vs_mean_col = 'vs_flow_resistance_mean[mOhm*cm]'
+        df_ecr.insert(len(df_ecr.columns), res_through_vs_mean_col, 0.0)
 
-    res_bulk_mean_col = 'bulk_resistance_mean[mOhm]'
-    df_ecr.insert(len(df_ecr.columns), res_bulk_mean_col, 0.0)
+        res_through_vs_error_col = 'vs_flow_resistance_error[mOhm*cm]'
+        df_ecr.insert(len(df_ecr.columns), res_through_vs_error_col, 0.0)
 
-    res_bulk_error_col = 'bulk_resistance_error[mOhm]'
-    df_ecr.insert(len(df_ecr.columns), res_bulk_error_col, 0.0)
+        # Bulkwiderstand
+        res_bulk_col = 'bulk_resistance[mOhm]'
+        df_ecr.insert(len(df_ecr.columns), res_bulk_col, 0.0)
 
-    res_bulk_sub_col = 'bulk_resistance_sub[mOhm]'
-    df_ecr.insert(len(df_ecr.columns), res_bulk_sub_col, 0.0)
+        res_bulk_mean_col = 'bulk_resistance_mean[mOhm]'
+        df_ecr.insert(len(df_ecr.columns), res_bulk_mean_col, 0.0)
 
-    # as-Bulkwiderstand
-    res_bulk_as_col = 'as_bulk_resistance[mOhm*cm2]'
-    df_ecr.insert(len(df_ecr.columns), res_bulk_as_col, 0.0)
+        res_bulk_error_col = 'bulk_resistance_error[mOhm]'
+        df_ecr.insert(len(df_ecr.columns), res_bulk_error_col, 0.0)
 
-    res_bulk_as_mean_col = 'as_bulk_resistance_mean[mOhm*cm2]'
-    df_ecr.insert(len(df_ecr.columns), res_bulk_as_mean_col, 0.0)
+        res_bulk_sub_col = 'bulk_resistance_sub[mOhm]'
+        df_ecr.insert(len(df_ecr.columns), res_bulk_sub_col, 0.0)
 
-    res_bulk_as_error_col = 'as_bulk_resistance_error[mOhm*cm2]'
-    df_ecr.insert(len(df_ecr.columns), res_bulk_as_error_col, 0.0)
+        # as-Bulkwiderstand
+        res_bulk_as_col = 'as_bulk_resistance[mOhm*cm2]'
+        df_ecr.insert(len(df_ecr.columns), res_bulk_as_col, 0.0)
 
-    # vs-Bulkwiderstand
-    res_bulk_vs_col = 'vs_bulk_resistance[mOhm*cm]'
-    df_ecr.insert(len(df_ecr.columns), res_bulk_vs_col, 0.0)
+        res_bulk_as_mean_col = 'as_bulk_resistance_mean[mOhm*cm2]'
+        df_ecr.insert(len(df_ecr.columns), res_bulk_as_mean_col, 0.0)
 
-    res_bulk_vs_mean_col = 'vs_bulk_resistance_mean[mOhm*cm]'
-    df_ecr.insert(len(df_ecr.columns), res_bulk_vs_mean_col, 0.0)
+        res_bulk_as_error_col = 'as_bulk_resistance_error[mOhm*cm2]'
+        df_ecr.insert(len(df_ecr.columns), res_bulk_as_error_col, 0.0)
 
-    res_bulk_vs_error_col = 'vs_bulk_resistance_error[mOhm*cm]'
-    df_ecr.insert(len(df_ecr.columns), res_bulk_vs_error_col, 0.0)
+        # vs-Bulkwiderstand
+        res_bulk_vs_col = 'vs_bulk_resistance[mOhm*cm]'
+        df_ecr.insert(len(df_ecr.columns), res_bulk_vs_col, 0.0)
 
-    # Kontaktwiderstand
-    res_contact_col = 'contact_resistance[mOhm]'
-    df_ecr.insert(len(df_ecr.columns), res_contact_col, 0.0)
+        res_bulk_vs_mean_col = 'vs_bulk_resistance_mean[mOhm*cm]'
+        df_ecr.insert(len(df_ecr.columns), res_bulk_vs_mean_col, 0.0)
 
-    res_contact_mean_col = 'contact_resistance_mean[mOhm]'
-    df_ecr.insert(len(df_ecr.columns), res_contact_mean_col, 0.0)
+        res_bulk_vs_error_col = 'vs_bulk_resistance_error[mOhm*cm]'
+        df_ecr.insert(len(df_ecr.columns), res_bulk_vs_error_col, 0.0)
 
-    res_contact_error_col = 'contact_resistance_error[mOhm]'
-    df_ecr.insert(len(df_ecr.columns), res_contact_error_col, 0.0)
+        # Kontaktwiderstand
+        res_contact_col = 'contact_resistance[mOhm]'
+        df_ecr.insert(len(df_ecr.columns), res_contact_col, 0.0)
 
-    # as-Kontaktwiderstand
-    res_contact_as_col = 'as_contact_resistance[mOhm*cm2]'
-    df_ecr.insert(len(df_ecr.columns), res_contact_as_col, 0.0)
+        res_contact_mean_col = 'contact_resistance_mean[mOhm]'
+        df_ecr.insert(len(df_ecr.columns), res_contact_mean_col, 0.0)
 
-    res_contact_as_mean_col = 'as_contact_resistance_mean[mOhm*cm2]'
-    df_ecr.insert(len(df_ecr.columns), res_contact_as_mean_col, 0.0)
+        res_contact_error_col = 'contact_resistance_error[mOhm]'
+        df_ecr.insert(len(df_ecr.columns), res_contact_error_col, 0.0)
 
-    res_contact_as_error_col = 'as_contact_resistance_error[mOhm*cm2]'
-    df_ecr.insert(len(df_ecr.columns), res_contact_as_error_col, 0.0)
+        # as-Kontaktwiderstand
+        res_contact_as_col = 'as_contact_resistance[mOhm*cm2]'
+        df_ecr.insert(len(df_ecr.columns), res_contact_as_col, 0.0)
 
-    # Gesamtleitwert
-    con_main_vs_col = 'vs_main_conductance[S/cm]'
-    df_ecr.insert(len(df_ecr.columns), con_main_vs_col, 0.0)
+        res_contact_as_mean_col = 'as_contact_resistance_mean[mOhm*cm2]'
+        df_ecr.insert(len(df_ecr.columns), res_contact_as_mean_col, 0.0)
 
-    con_main_vs_mean_col = 'vs_main_conductance_mean[S/cm]'
-    df_ecr.insert(len(df_ecr.columns), con_main_vs_mean_col, 0.0)
+        res_contact_as_error_col = 'as_contact_resistance_error[mOhm*cm2]'
+        df_ecr.insert(len(df_ecr.columns), res_contact_as_error_col, 0.0)
 
-    con_main_vs_error_col = 'vs_main_conductance_error[S/cm]'
-    df_ecr.insert(len(df_ecr.columns), con_main_vs_error_col, 0.0)
+        # Gesamtleitwert
+        con_main_vs_col = 'vs_main_conductance[S/cm]'
+        df_ecr.insert(len(df_ecr.columns), con_main_vs_col, 0.0)
 
-    # Durchgangsleitwert
-    con_through_vs_col = 'vs_flow_conductance[S/cm]'
-    df_ecr.insert(len(df_ecr.columns), con_through_vs_col, 0.0)
+        con_main_vs_mean_col = 'vs_main_conductance_mean[S/cm]'
+        df_ecr.insert(len(df_ecr.columns), con_main_vs_mean_col, 0.0)
 
-    con_through_vs_mean_col = 'vs_flow_conductance_mean[S/cm]'
-    df_ecr.insert(len(df_ecr.columns), con_through_vs_mean_col, 0.0)
+        con_main_vs_error_col = 'vs_main_conductance_error[S/cm]'
+        df_ecr.insert(len(df_ecr.columns), con_main_vs_error_col, 0.0)
 
-    con_through_vs_error_col = 'vs_flow_conductance_error[S/cm]'
-    df_ecr.insert(len(df_ecr.columns), con_through_vs_error_col, 0.0)
+        # Durchgangsleitwert
+        con_through_vs_col = 'vs_flow_conductance[S/cm]'
+        df_ecr.insert(len(df_ecr.columns), con_through_vs_col, 0.0)
 
-    # Bulkleitwert
-    con_bulk_vs_col = 'vs_bulk_conductance[S/cm]'
-    df_ecr.insert(len(df_ecr.columns), con_bulk_vs_col, 0.0)
+        con_through_vs_mean_col = 'vs_flow_conductance_mean[S/cm]'
+        df_ecr.insert(len(df_ecr.columns), con_through_vs_mean_col, 0.0)
 
-    con_bulk_vs_mean_col = 'vs_bulk_conductance_mean[S/cm]'
-    df_ecr.insert(len(df_ecr.columns), con_bulk_vs_mean_col, 0.0)
+        con_through_vs_error_col = 'vs_flow_conductance_error[S/cm]'
+        df_ecr.insert(len(df_ecr.columns), con_through_vs_error_col, 0.0)
 
-    con_bulk_vs_error_col = 'vs_bulk_conductance_error[S/cm]'
-    df_ecr.insert(len(df_ecr.columns), con_bulk_vs_error_col, 0.0)
+        # Bulkleitwert
+        con_bulk_vs_col = 'vs_bulk_conductance[S/cm]'
+        df_ecr.insert(len(df_ecr.columns), con_bulk_vs_col, 0.0)
 
-    no_cyc = int(entries['gdl_age'])
+        con_bulk_vs_mean_col = 'vs_bulk_conductance_mean[S/cm]'
+        df_ecr.insert(len(df_ecr.columns), con_bulk_vs_mean_col, 0.0)
 
-    meas_currents = np.unique(df_ecr['current_rounded[mA]'].to_numpy(dtype=int))
-    meas_pressures = np.unique(df_ecr['pressure_rounded[bar]'].to_numpy(dtype=int))
+        con_bulk_vs_error_col = 'vs_bulk_conductance_error[S/cm]'
+        df_ecr.insert(len(df_ecr.columns), con_bulk_vs_error_col, 0.0)
 
-    for index, row in df_ecr.iterrows():
+        no_cyc = int(entries['gdl_age'])
 
-        current = row['current_rounded[mA]']
-        pressure = row['pressure_rounded[bar]']
+        meas_currents = np.unique(df_ecr['current_rounded[mA]'].to_numpy(dtype=int))
+        meas_pressures = np.unique(df_ecr['pressure_rounded[bar]'].to_numpy(dtype=int))
 
-        if current == min(meas_currents) and pressure == min(meas_pressures):
-            no_cyc += 1
+        for index, row in df_ecr.iterrows():
 
-        df_ecr.loc[index, 'cycle'] = no_cyc
+            current = row['current_rounded[mA]']
+            pressure = row['pressure_rounded[bar]']
 
-    measurements = np.unique(df_ecr['measurement'].to_numpy())
-    pressures = np.unique(pressure_rounded.to_numpy(dtype=int))
-    cycles = np.unique(df_ecr['cycle'].to_numpy(dtype=int))
+            if current == min(meas_currents) and pressure == min(meas_pressures):
+                no_cyc += 1
 
-    df_h23 = pd.read_csv('h23_reference.csv', sep='\t')
+            df_ecr.loc[index, 'cycle'] = no_cyc
 
-    pressure_ref = [1, 2, 3, 5, 6, 9, 10, 12, 15, 18, 20, 21, 24, 27, 30]
-    print(df_ecr)
-    for c in cycles:
+        measurements = np.unique(df_ecr['measurement'].to_numpy())
+        pressures = np.unique(pressure_rounded.to_numpy(dtype=int))
+        cycles = np.unique(df_ecr['cycle'].to_numpy(dtype=int))
 
-        gdl_cycle = df_h23['cycle'] == c
-        data_cycle = df_ecr['cycle'] == c
+        df_h23 = pd.read_csv('h23_reference.csv', sep='\t')
 
-        for p in pressures:
-
-            if p in pressure_ref:
-                p_lookup = p
-            else:
-                p_lookup = min(pressure_ref, key=lambda x: abs(x - p))
-
-            gdl_pressure = df_h23['pressure_rounded[bar]'] == p_lookup
-            data_pressure = df_ecr['pressure_rounded[bar]'] == p_lookup
-
-            gdl_corr = df_h23[gdl_cycle & gdl_pressure]['as_main_resistance[mOhm*cm2]'].mean() / \
-                       df_h23[gdl_cycle & gdl_pressure]['contact_area[cm2]'].mean()
-            gdl_as_corr = df_h23[gdl_cycle & gdl_pressure]['as_main_resistance[mOhm*cm2]'].mean()
-            df_ecr.loc[data_cycle & data_pressure, corr] = gdl_corr
-            df_ecr.loc[data_cycle & data_pressure, as_corr] = gdl_as_corr
-
-    # seperate datafile into different measurements
-    for m in measurements:
-
-        data_measurement = df_ecr['measurement'] == m
-
-        #     id = ref + ' ' + sample + ' ' + comment
-
-        #     df_ecr.insert(2, 'measurement', id, True)
-
+        pressure_ref = [1, 2, 3, 5, 6, 9, 10, 12, 15, 18, 20, 21, 24, 27, 30]
+        print(df_ecr)
         for c in cycles:
-            print('calculating_data cycles: ' + str(c) + '/' + str(max(cycles)))
+
+            gdl_cycle = df_h23['cycle'] == c
             data_cycle = df_ecr['cycle'] == c
 
             for p in pressures:
 
-                data_pressure = df_ecr['pressure_rounded[bar]'] == p
-
-                df = df_ecr[data_cycle & data_pressure]
-
-                res_main = df['voltage_th[mV]'] / df['current[mA]'] * 1000
-                res_main_mean = res_main.mean()
-                res_main_error = res_main.sem()
-                res_main_as = res_main * df['contact_area[cm2]']
-                res_main_as_mean = res_main_as.mean()
-                res_main_as_error = res_main_as.sem()
-                res_main_vs = res_main_as / df['sample_thickness[cm]']
-                res_main_vs_mean = res_main_vs.mean()
-                res_main_vs_error = res_main_vs.sem()
-                con_main_vs = 1 / res_main_vs
-                con_main_vs_mean = con_main_vs.mean()
-                con_main_vs_error = con_main_vs.sem()
-                df_ecr.loc[data_cycle & data_pressure, res_main_col] = res_main
-                df_ecr.loc[data_cycle & data_pressure, res_main_mean_col] = res_main_mean
-                df_ecr.loc[data_cycle & data_pressure, res_main_error_col] = res_main_error
-                df_ecr.loc[data_cycle & data_pressure, res_main_as_col] = res_main_as
-                df_ecr.loc[data_cycle & data_pressure, res_main_as_mean_col] = res_main_as_mean
-                df_ecr.loc[data_cycle & data_pressure, res_main_as_error_col] = res_main_as_error
-                df_ecr.loc[data_cycle & data_pressure, res_main_vs_col] = res_main_vs
-                df_ecr.loc[data_cycle & data_pressure, res_main_vs_mean_col] = res_main_vs_mean
-                df_ecr.loc[data_cycle & data_pressure, res_main_vs_error_col] = res_main_vs_error
-                df_ecr.loc[data_cycle & data_pressure, con_main_vs_col] = con_main_vs
-                df_ecr.loc[data_cycle & data_pressure, con_main_vs_mean_col] = con_main_vs_mean
-                df_ecr.loc[data_cycle & data_pressure, con_main_vs_error_col] = con_main_vs_error
-
-                res_through = res_main - df_ecr[corr]
-                res_through_mean = res_through.mean()
-                res_through_error = res_through.sem()
-                res_through_as = res_through * df['contact_area[cm2]']
-                res_through_as_mean = res_through_as.mean()
-                res_through_as_error = res_through_as.sem()
-                res_through_vs = res_through_as / df['sample_thickness[cm]']
-                res_through_vs_mean = res_through_vs.mean()
-                res_through_vs_error = res_through_vs.sem()
-                con_through_vs = 1 / res_through_vs
-                con_through_vs_mean = res_through_vs.mean()
-                con_through_vs_error = res_through_vs.sem()
-                df_ecr.loc[data_cycle & data_pressure, res_through_col] = res_through
-                df_ecr.loc[data_cycle & data_pressure, res_through_mean_col] = res_through_mean
-                df_ecr.loc[data_cycle & data_pressure, res_through_error_col] = res_through_error
-                df_ecr.loc[data_cycle & data_pressure, res_through_as_col] = res_through_as
-                df_ecr.loc[data_cycle & data_pressure, res_through_as_mean_col] = res_through_as_mean
-                df_ecr.loc[data_cycle & data_pressure, res_through_as_error_col] = res_through_as_error
-                df_ecr.loc[data_cycle & data_pressure, res_through_vs_col] = res_through_vs
-                df_ecr.loc[data_cycle & data_pressure, res_through_vs_mean_col] = res_through_vs_mean
-                df_ecr.loc[data_cycle & data_pressure, res_through_vs_error_col] = res_through_vs_error
-                df_ecr.loc[data_cycle & data_pressure, con_through_vs_col] = con_through_vs
-                df_ecr.loc[data_cycle & data_pressure, con_through_vs_mean_col] = res_through_vs_mean
-                df_ecr.loc[data_cycle & data_pressure, con_through_vs_error_col] = res_through_vs_error
-
-                if entries['mode'] == 'yes':
-                    res_bulk = df['voltage_needle_th[mV]'] / df['current[mA]'] * 1000
+                if p in pressure_ref:
+                    p_lookup = p
                 else:
-                    res_bulk = df['voltage_needle_th[mV]'] * 0
+                    p_lookup = min(pressure_ref, key=lambda x: abs(x - p))
 
-                res_bulk_mean = res_bulk.mean()
-                res_bulk_error = res_bulk.sem()
-                res_bulk_as = res_bulk * df['contact_area[cm2]']
-                res_bulk_as_mean = res_bulk_as.mean()
-                res_bulk_as_error = res_bulk_as.sem()
-                res_bulk_vs = res_bulk_as / df['sample_thickness[cm]']
-                res_bulk_vs_mean = res_bulk_vs.mean()
-                res_bulk_vs_error = res_bulk_vs.sem()
-                con_bulk_vs = 1 / res_bulk_vs
-                con_bulk_vs_mean = con_bulk_vs.mean()
-                con_bulk_vs_error = con_bulk_vs.sem()
-                df_ecr.loc[data_cycle & data_pressure, res_bulk_col] = res_bulk
-                df_ecr.loc[data_cycle & data_pressure, res_bulk_mean_col] = res_bulk_mean
-                df_ecr.loc[data_cycle & data_pressure, res_bulk_error_col] = res_bulk_error
-                df_ecr.loc[data_cycle & data_pressure, res_bulk_as_col] = res_bulk_as
-                df_ecr.loc[data_cycle & data_pressure, res_bulk_as_mean_col] = res_bulk_as_mean
-                df_ecr.loc[data_cycle & data_pressure, res_bulk_as_error_col] = res_bulk_as_error
-                df_ecr.loc[data_cycle & data_pressure, res_bulk_vs_col] = res_bulk_vs
-                df_ecr.loc[data_cycle & data_pressure, res_bulk_vs_mean_col] = res_bulk_vs_mean
-                df_ecr.loc[data_cycle & data_pressure, res_bulk_vs_error_col] = res_bulk_vs_error
-                df_ecr.loc[data_cycle & data_pressure, con_bulk_vs_col] = con_bulk_vs
-                df_ecr.loc[data_cycle & data_pressure, con_bulk_vs_mean_col] = con_bulk_vs_mean
-                df_ecr.loc[data_cycle & data_pressure, con_bulk_vs_error_col] = con_bulk_vs_error
+                gdl_pressure = df_h23['pressure_rounded[bar]'] == p_lookup
+                data_pressure = df_ecr['pressure_rounded[bar]'] == p_lookup
 
-                res_contact = (res_through - res_bulk) / 2
-                res_contact_mean = res_contact.mean()
-                res_contact_error = res_contact.sem()
-                res_contact_as = res_contact * df['contact_area[cm2]']
-                res_contact_as_mean = res_contact.mean()
-                res_contact_as_error = res_contact.sem()
-                df_ecr.loc[data_cycle & data_pressure, res_contact_col] = res_contact
-                df_ecr.loc[data_cycle & data_pressure, res_contact_mean_col] = res_contact_mean
-                df_ecr.loc[data_cycle & data_pressure, res_contact_error_col] = res_contact_error
-                df_ecr.loc[data_cycle & data_pressure, res_contact_as_col] = res_contact_as
-                df_ecr.loc[data_cycle & data_pressure, res_contact_as_mean_col] = res_contact_as_mean
-                df_ecr.loc[data_cycle & data_pressure, res_contact_as_error_col] = res_contact_as_error
+                gdl_corr = df_h23[gdl_cycle & gdl_pressure]['as_main_resistance[mOhm*cm2]'].mean() / \
+                           df_h23[gdl_cycle & gdl_pressure]['contact_area[cm2]'].mean()
+                gdl_as_corr = df_h23[gdl_cycle & gdl_pressure]['as_main_resistance[mOhm*cm2]'].mean()
+                df_ecr.loc[data_cycle & data_pressure, corr] = gdl_corr
+                df_ecr.loc[data_cycle & data_pressure, as_corr] = gdl_as_corr
 
 
-    ecr_data_dict = df_ecr.to_dict('records')
-    db_data_dict = {'measurement': 'ECR', "name": entries['sample'], 'mode': entries['mode'], 'gdl': entries['gdl'],
-                    'date': entries['date'], 'add_info': entries['opt_info'], 'area [cm^2]': entries['area'],
-                    'thickness': entries['thickness'], 'cycle#': entries['gdl_age'], 'cycles': len(cycles),
-                    'ecr_data': ecr_data_dict}
+        # seperate datafile into different measurements
+        for m in measurements:
+
+            data_measurement = df_ecr['measurement'] == m
+
+            #     id = ref + ' ' + sample + ' ' + comment
+
+            #     df_ecr.insert(2, 'measurement', id, True)
+
+            for c in cycles:
+                print('calculating_data cycles: ' + str(c) + '/' + str(max(cycles)))
+                data_cycle = df_ecr['cycle'] == c
+                pb["maximum"] = len(cycles)*len(pressures)
+                print(len(cycles), len(pressures))
+                for p in pressures:
+                    pb['value'] += 1
+                    print(pb['value'])
+                    data_pressure = df_ecr['pressure_rounded[bar]'] == p
+
+                    df = df_ecr[data_cycle & data_pressure]
+
+                    res_main = df['voltage_th[mV]'] / df['current[mA]'] * 1000
+                    res_main_mean = res_main.mean()
+                    res_main_error = res_main.sem()
+                    res_main_as = res_main * df['contact_area[cm2]']
+                    res_main_as_mean = res_main_as.mean()
+                    res_main_as_error = res_main_as.sem()
+                    res_main_vs = res_main_as / df['sample_thickness[cm]']
+                    res_main_vs_mean = res_main_vs.mean()
+                    res_main_vs_error = res_main_vs.sem()
+                    con_main_vs = 1 / res_main_vs
+                    con_main_vs_mean = con_main_vs.mean()
+                    con_main_vs_error = con_main_vs.sem()
+                    df_ecr.loc[data_cycle & data_pressure, res_main_col] = res_main
+                    df_ecr.loc[data_cycle & data_pressure, res_main_mean_col] = res_main_mean
+                    df_ecr.loc[data_cycle & data_pressure, res_main_error_col] = res_main_error
+                    df_ecr.loc[data_cycle & data_pressure, res_main_as_col] = res_main_as
+                    df_ecr.loc[data_cycle & data_pressure, res_main_as_mean_col] = res_main_as_mean
+                    df_ecr.loc[data_cycle & data_pressure, res_main_as_error_col] = res_main_as_error
+                    df_ecr.loc[data_cycle & data_pressure, res_main_vs_col] = res_main_vs
+                    df_ecr.loc[data_cycle & data_pressure, res_main_vs_mean_col] = res_main_vs_mean
+                    df_ecr.loc[data_cycle & data_pressure, res_main_vs_error_col] = res_main_vs_error
+                    df_ecr.loc[data_cycle & data_pressure, con_main_vs_col] = con_main_vs
+                    df_ecr.loc[data_cycle & data_pressure, con_main_vs_mean_col] = con_main_vs_mean
+                    df_ecr.loc[data_cycle & data_pressure, con_main_vs_error_col] = con_main_vs_error
+
+                    res_through = res_main - df_ecr[corr]
+                    res_through_mean = res_through.mean()
+                    res_through_error = res_through.sem()
+                    res_through_as = res_through * df['contact_area[cm2]']
+                    res_through_as_mean = res_through_as.mean()
+                    res_through_as_error = res_through_as.sem()
+                    res_through_vs = res_through_as / df['sample_thickness[cm]']
+                    res_through_vs_mean = res_through_vs.mean()
+                    res_through_vs_error = res_through_vs.sem()
+                    con_through_vs = 1 / res_through_vs
+                    con_through_vs_mean = res_through_vs.mean()
+                    con_through_vs_error = res_through_vs.sem()
+                    df_ecr.loc[data_cycle & data_pressure, res_through_col] = res_through
+                    df_ecr.loc[data_cycle & data_pressure, res_through_mean_col] = res_through_mean
+                    df_ecr.loc[data_cycle & data_pressure, res_through_error_col] = res_through_error
+                    df_ecr.loc[data_cycle & data_pressure, res_through_as_col] = res_through_as
+                    df_ecr.loc[data_cycle & data_pressure, res_through_as_mean_col] = res_through_as_mean
+                    df_ecr.loc[data_cycle & data_pressure, res_through_as_error_col] = res_through_as_error
+                    df_ecr.loc[data_cycle & data_pressure, res_through_vs_col] = res_through_vs
+                    df_ecr.loc[data_cycle & data_pressure, res_through_vs_mean_col] = res_through_vs_mean
+                    df_ecr.loc[data_cycle & data_pressure, res_through_vs_error_col] = res_through_vs_error
+                    df_ecr.loc[data_cycle & data_pressure, con_through_vs_col] = con_through_vs
+                    df_ecr.loc[data_cycle & data_pressure, con_through_vs_mean_col] = res_through_vs_mean
+                    df_ecr.loc[data_cycle & data_pressure, con_through_vs_error_col] = res_through_vs_error
+
+                    if entries['mode'] == 'yes':
+                        res_bulk = df['voltage_needle_th[mV]'] / df['current[mA]'] * 1000
+                    else:
+                        res_bulk = df['voltage_needle_th[mV]'] * 0
+
+                    res_bulk_mean = res_bulk.mean()
+                    res_bulk_error = res_bulk.sem()
+                    res_bulk_as = res_bulk * df['contact_area[cm2]']
+                    res_bulk_as_mean = res_bulk_as.mean()
+                    res_bulk_as_error = res_bulk_as.sem()
+                    res_bulk_vs = res_bulk_as / df['sample_thickness[cm]']
+                    res_bulk_vs_mean = res_bulk_vs.mean()
+                    res_bulk_vs_error = res_bulk_vs.sem()
+                    con_bulk_vs = 1 / res_bulk_vs
+                    con_bulk_vs_mean = con_bulk_vs.mean()
+                    con_bulk_vs_error = con_bulk_vs.sem()
+                    df_ecr.loc[data_cycle & data_pressure, res_bulk_col] = res_bulk
+                    df_ecr.loc[data_cycle & data_pressure, res_bulk_mean_col] = res_bulk_mean
+                    df_ecr.loc[data_cycle & data_pressure, res_bulk_error_col] = res_bulk_error
+                    df_ecr.loc[data_cycle & data_pressure, res_bulk_as_col] = res_bulk_as
+                    df_ecr.loc[data_cycle & data_pressure, res_bulk_as_mean_col] = res_bulk_as_mean
+                    df_ecr.loc[data_cycle & data_pressure, res_bulk_as_error_col] = res_bulk_as_error
+                    df_ecr.loc[data_cycle & data_pressure, res_bulk_vs_col] = res_bulk_vs
+                    df_ecr.loc[data_cycle & data_pressure, res_bulk_vs_mean_col] = res_bulk_vs_mean
+                    df_ecr.loc[data_cycle & data_pressure, res_bulk_vs_error_col] = res_bulk_vs_error
+                    df_ecr.loc[data_cycle & data_pressure, con_bulk_vs_col] = con_bulk_vs
+                    df_ecr.loc[data_cycle & data_pressure, con_bulk_vs_mean_col] = con_bulk_vs_mean
+                    df_ecr.loc[data_cycle & data_pressure, con_bulk_vs_error_col] = con_bulk_vs_error
+
+                    res_contact = (res_through - res_bulk) / 2
+                    res_contact_mean = res_contact.mean()
+                    res_contact_error = res_contact.sem()
+                    res_contact_as = res_contact * df['contact_area[cm2]']
+                    res_contact_as_mean = res_contact.mean()
+                    res_contact_as_error = res_contact.sem()
+                    df_ecr.loc[data_cycle & data_pressure, res_contact_col] = res_contact
+                    df_ecr.loc[data_cycle & data_pressure, res_contact_mean_col] = res_contact_mean
+                    df_ecr.loc[data_cycle & data_pressure, res_contact_error_col] = res_contact_error
+                    df_ecr.loc[data_cycle & data_pressure, res_contact_as_col] = res_contact_as
+                    df_ecr.loc[data_cycle & data_pressure, res_contact_as_mean_col] = res_contact_as_mean
+                    df_ecr.loc[data_cycle & data_pressure, res_contact_as_error_col] = res_contact_as_error
 
 
-    try:
-        current_collection.insert_one(db_data_dict)
-    except NameError:
-        pass
+        ecr_data_dict = df_ecr.to_dict('records')
+        db_data_dict = {'measurement': 'ECR', "name": entries['sample'], 'mode': entries['mode'], 'gdl': entries['gdl'],
+                        'date': entries['date'], 'add_info': entries['opt_info'], 'area [cm^2]': entries['area'],
+                        'thickness': entries['thickness'], 'cycle#': entries['gdl_age'], 'cycles': len(cycles),
+                        'ecr_data': ecr_data_dict}
 
-    filename = str(entries['sample']) + '.csv'
-    df_ecr.to_csv('database/database_ecrdata/' + filename, mode='w', header=True, index=False, sep='\t')
-    df_ecr.to_csv('database/database_ecrdata/ecrdata.csv', mode='a', header=False, index=False, sep='\t')
 
-    verify_ecr_import(df_ecr, entries)
+        try:
+            current_collection.insert_one(db_data_dict)
+        except NameError:
+            pass
 
-    frame.destroy()
+        filename = str(entries['sample']) + '.csv'
+        df_ecr.to_csv('database/database_ecrdata/' + filename, mode='w', header=True, index=False, sep='\t')
+        df_ecr.to_csv('database/database_ecrdata/ecrdata.csv', mode='a', header=False, index=False, sep='\t')
+
+
+        frame.destroy()
+        progress.destroy()
+        verify_ecr_import(df_ecr, entries)
+    threading.Thread(target=real_save).start()
 
 def verify_ecr_import(df_ecr, entries):
     measurements = np.unique(df_ecr['measurement'].to_numpy())
@@ -1802,120 +1892,84 @@ def delete_ecr_file(frame, dropdown_var):
         print('deleted ' + str(dropdown_var) + 'from database!')
 
 def edit_ecr_file(frame, dropdown_var):
-    data = current_collection.find_one({'name': dropdown_var[10:-2], 'measurement': 'EIS'}, {'_id': 0})
+    data = current_collection.find_one({'name': dropdown_var[10:-2], 'measurement': 'ECR'}, {'_id': 0})
 
-    editor = ZBTtoplevel(master=frame, name='Edit File', rows=10, columns=3, x_dim=500, y_dim=400)
+    ecr_editor = ZBTtoplevel('Edit ECR-Data', rows=14, columns=3, x_dim=500, y_dim=400)
 
-    l1_eis_imp = ZBTlabel(master=editor, font_spec='header', font_size=16, text='Sample:')
-    l1_eis_imp.grid(row=3, column=0, sticky='nws')
+    # header
+    l_head = ZBTlabel(master=ecr_editor.sub_top, font_spec='header', font_size=16, text='ECR Data-Edit')
+    l_head.grid(row=0, column=0, columnspan=3, sticky='news')
 
-    l2_eis_imp = ZBTlabel(master=editor, font_spec='header', font_size=16, text='Date:')
-    l2_eis_imp.grid(row=4, column=0, sticky='nws')
+    # labels
+    l1_ecr_edit = ZBTlabel(master=ecr_editor.sub_top, font_size=12, text='Sample:')
+    l1_ecr_edit.grid(row=3, column=0, sticky='nws')
 
-    l9_eis_imp = ZBTlabel(master=editor, font_spec='header', font_size=16, text='Voltage:')
-    l9_eis_imp.grid(row=5, column=0, sticky='nws')
+    l2_ecr_edit = ZBTlabel(master=ecr_editor.sub_top, font_size=12, text='Date:')
+    l2_ecr_edit.grid(row=4, column=0, sticky='nws')
 
-    l3_eis_imp = ZBTlabel(master=editor, font_spec='header', font_size=16, text='Area')
-    l3_eis_imp.grid(row=6, column=0, sticky='nws')
+    # l3_ecr_edit = ZBTlabel(master=ecr_editor.sub_top, font_size=12, text='GDL:')
+    # l3_ecr_edit.grid(row=5, column=0, sticky='nws')
 
-    l4_eis_imp = ZBTlabel(master=editor, font_spec='header', font_size=16, text='FlowRate (C)')
-    l4_eis_imp.grid(row=7, column=0, sticky='nws')  #
+    # l4_ecr_edit = ZBTlabel(master=ecr_editor.sub_top, font_size=12, text='Meas. Pin:')
+    # l4_ecr_edit.grid(row=6, column=0, sticky='nws')  #
 
-    l5_eis_imp = ZBTlabel(master=editor, font_spec='header', font_size=16, text='FlowRate (A)')
-    l5_eis_imp.grid(row=8, column=0, sticky='nws')
+    l6_ecr_edit = ZBTlabel(master=ecr_editor.sub_top, font_size=12, text='Thickness:')
+    l6_ecr_edit.grid(row=5, column=0, sticky='nws')
 
-    l6_eis_imp = ZBTlabel(master=editor, font_spec='header', font_size=16, text='Temperature')
-    l6_eis_imp.grid(row=9, column=0, sticky='nws')
+    l7_ecr_edit = ZBTlabel(master=ecr_editor.sub_top, font_size=12, text='Area:')
+    l7_ecr_edit.grid(row=6, column=0, sticky='nws')
 
-    l8_eis_imp = ZBTlabel(master=editor, font_spec='header', font_size=16, text='Amp. Signal')
-    l8_eis_imp.grid(row=10, column=0, sticky='nws')
+    l8_ecr_edit = ZBTlabel(master=ecr_editor.sub_top, font_size=12, text='GDL Cycles BM.:')
+    l8_ecr_edit.grid(row=7, column=0, sticky='nws')
 
-    l7_eis_imp = ZBTlabel(master=editor, font_spec='header', font_size=16, text='Opt. Info:')
-    l7_eis_imp.grid(row=12, column=0, sticky='nws')
+    l9_ecr_edit = ZBTlabel(master=ecr_editor.sub_top, font_size=12, text='Opt. Info:')
+    l9_ecr_edit.grid(row=8, column=0, sticky='nws')
 
-    var = tk.StringVar()
+    # units-labels
+    l02_ecr_edit = ZBTlabel(master=ecr_editor.sub_top, font_size=10, text='[dd.mm.yyyy]')
+    l02_ecr_edit.grid(row=4, column=2, sticky='nws')
 
-    rb1_eis_imp = tk.Radiobutton(master=editor, text="GEIS", variable=var, value='peis', bg='lightgrey')
-    rb2_eis_imp = tk.Radiobutton(master=editor, text="PEIS", variable=var, value='geis', bg='lightgrey')
+    l06_ecr_edit = ZBTlabel(master=ecr_editor.sub_top, font_size=10, text='[mm]')
+    l06_ecr_edit.grid(row=5, column=2, sticky='nws')
 
-    rb1_eis_imp.grid(row=11, padx=20, column=1, sticky='w')
-    rb2_eis_imp.grid(row=11, padx=20, column=1, sticky='e')
+    l07_ecr_edit = ZBTlabel(master=ecr_editor.sub_top, font_size=10, text='[cm^2]')
+    l07_ecr_edit.grid(row=6, column=2, sticky='nws')
 
-    rb1_eis_imp.select()
-    rb2_eis_imp.select()
+    l08_ecr_edit = ZBTlabel(master=ecr_editor.sub_top, font_size=10, text='[#]')
+    l08_ecr_edit.grid(row=7, column=2, sticky='nws')
 
-    l02_eis_imp = ZBTlabel(master=editor, font_size=16, text='dd.mm.yyyy')
-    l02_eis_imp.grid(row=4, column=2, sticky='nes')
+    # TODO: auswahl Drücke und Mesströme in Datei
 
-    l09_eis_imp = ZBTlabel(master=editor, font_size=16, text='V')
-    l09_eis_imp.grid(row=5, column=2, sticky='nes')
+    # entries
+    e1_ecr_edit = ZBTentry(master=ecr_editor.sub_top)
+    e1_ecr_edit.grid(row=3, column=1, sticky='news')
+    e1_ecr_edit.insert(0, data.get('name'))
 
-    l03_eis_imp = ZBTlabel(master=editor, font_size=16, text='cm²')
-    l03_eis_imp.grid(row=6, column=2, sticky='nes')
+    e2_ecr_edit = ZBTentry(master=ecr_editor.sub_top)
+    e2_ecr_edit.grid(row=4, column=1, sticky='news')
+    e2_ecr_edit.insert(0, data.get('date'))
 
-    l04_eis_imp = ZBTlabel(master=editor, font_size=16, text='l/min')
-    l04_eis_imp.grid(row=7, column=2, sticky='nes')
+    e5_ecr_edit = ZBTentry(master=ecr_editor.sub_top)
+    e5_ecr_edit.grid(row=5, column=1, sticky='news')
+    e5_ecr_edit.insert(0, data.get('thickness'))
 
-    l05_eis_imp = ZBTlabel(master=editor, font_size=16, text='l/min')
-    l05_eis_imp.grid(row=8, column=2, sticky='nes')
+    e6_ecr_edit = ZBTentry(master=ecr_editor.sub_top)
+    e6_ecr_edit.grid(row=6, column=1, sticky='news')
+    e6_ecr_edit.insert(0, data.get('area [cm^2]'))
 
-    l06_eis_imp = ZBTlabel(master=editor, font_size=16, text='°C')
-    l06_eis_imp.grid(row=9, column=2, sticky='nes')
+    e7_ecr_edit = ZBTentry(master=ecr_editor.sub_top)
+    e7_ecr_edit.grid(row=7, column=1, sticky='news')
+    e7_ecr_edit.insert(0, data.get('cycle#'))
 
-    l08_eis_imp = ZBTlabel(master=editor, font_size=16, text='mA/mV')
-    l08_eis_imp.grid(row=10, column=2, sticky='nes')
+    e10_ecr_edit = ZBTentry(master=ecr_editor.sub_top)
+    e10_ecr_edit.grid(row=8, column=1, sticky='news')
+    e10_ecr_edit.insert(0, data.get('add_info'))
 
-    e1_eis_imp = ZBTentry(master=editor)
-    e1_eis_imp.grid(row=3, column=1, sticky='news')
-    e1_eis_imp.insert(0, data.get('name'))
+    b1_ecr_edit = ZBTbutton(master=ecr_editor.sub_top, text='OK')
 
-    e2_eis_imp = ZBTentry(master=editor)
-    e2_eis_imp.grid(row=4, column=1, sticky='news')
-    e2_eis_imp.insert(0, data.get('date'))
+    b1_ecr_edit.grid(row=13, column=1, sticky='news')
 
-    e9_eis_imp = ZBTentry(master=editor)
-    e9_eis_imp.grid(row=5, column=1, sticky='news')
-    e9_eis_imp.insert(0, data.get('voltage'))
-
-    e3_eis_imp = ZBTentry(master=editor)
-    e3_eis_imp.grid(row=6, column=1, sticky='news')
-    e3_eis_imp.insert(0, data.get('area [cm^2]'))
-
-    e4_eis_imp = ZBTentry(master=editor)
-    e4_eis_imp.grid(row=7, column=1, sticky='news')
-    e4_eis_imp.insert(0, data.get('flow_rate_cathode [ml/min]'))
-
-    e5_eis_imp = ZBTentry(master=editor)
-    e5_eis_imp.grid(row=8, column=1, sticky='news')
-    e5_eis_imp.insert(0, data.get('flow_rate_anode [ml/min]'))
-
-    e6_eis_imp = ZBTentry(master=editor)
-    e6_eis_imp.grid(row=9, column=1, sticky='news')
-    e6_eis_imp.insert(0, data.get('temperature [°C]'))
-
-    e7_eis_imp = ZBTentry(master=editor)
-    e7_eis_imp.grid(row=10, column=1, sticky='news')
-    e7_eis_imp.insert(0, data.get('signal amp.'))
-
-    e10_eis_imp = ZBTentry(master=editor)
-    e10_eis_imp.grid(row=12, column=1, sticky='news')
-    e10_eis_imp.insert(0, data.get('add_info'))
-
-    b1_eis_imp = ZBTbutton(master=editor, text='OK', command=lambda: data_edit_eis(editor, dropdown_var,
-                                                                               e1_eis_imp.get(),
-                                                                               e2_eis_imp.get(),
-                                                                               e3_eis_imp.get(),
-                                                                               e4_eis_imp.get(),
-                                                                               e5_eis_imp.get(),
-                                                                               e6_eis_imp.get(),
-                                                                               e7_eis_imp.get(),
-                                                                               e9_eis_imp.get(),
-                                                                               e10_eis_imp.get(),
-                                                                               var.get()))
-
-    b1_eis_imp.grid(row=14, column=1, sticky='news')
-
-    editor.mainloop()
+    ecr_editor.mainloop()
 
 def data_edit_ecr(frame, dropdown_var, e1, e2, e3, e4, e5, e6, e7, e9, e10, var):
 
@@ -1936,21 +1990,21 @@ def data_edit_ecr(frame, dropdown_var, e1, e2, e3, e4, e5, e6, e7, e9, e10, var)
 def export_ecr_graph(plot_list):
     fig, ax = plt.subplots()
 
-    title = 'Nyquist-Plot'
+    title = 'ECR'
     ax.set_title(title)
-    ax.set_xlabel('Z (Re) [Ohm*cm^2]')
-    ax.set_ylabel('Z (Im) [Ohm*cm^2]')
+    ax.set_xlabel('pressure [bar]')
+    ax.set_ylabel('contact resistance [mOhm*cm^2]')
     ax.grid(b=True, which='both')
 
     for i in plot_list:
         try:
             # TODO: structure / reading of eis-data
-            entry = current_collection.find_one({'measurement': 'EIS', 'name': i[10:-2]}, {'_id': 0})
-            eis_data = pd.DataFrame.from_dict(entry.get('eis_data'))
-            table_data = [entry.get('name'), entry.get('date'), entry.get('area [cm^2]'), \
-                          entry.get('flowrate_cathode [ml/min]'), entry.get('flowrate_anode [ml/min]'), \
-                          entry.get('temperature [°C]'), entry.get('current'), entry.get('signal ampl.'),
-                          entry.get('voltage'), entry.get('mode')]
+            entry = current_collection.find_one({'measurement': 'ECR', 'name': i[10:-2]}, {'_id': 0})
+            ecr_data = pd.DataFrame.from_dict(entry.get('ecr_data'))
+            # table_data = [entry.get('name'), entry.get('date'), entry.get('area [cm^2]'), \
+            #               entry.get('flowrate_cathode [ml/min]'), entry.get('flowrate_anode [ml/min]'), \
+            #               entry.get('temperature [°C]'), entry.get('current'), entry.get('signal ampl.'),
+            #               entry.get('voltage'), entry.get('mode')]
 
         except:
             eis_data = pd.read_csv('database/database_eisdata/' + i, delimiter='\t')
@@ -1958,8 +2012,16 @@ def export_ecr_graph(plot_list):
                           eis_data.iloc[1]['flow_rate_C [l/min]'], eis_data.iloc[1]['flow_rate_A [l/min]'],
                           eis_data.iloc[1]['Temperature [Cel.]']]
 
-        x_values = np.asarray(eis_data['Re [Ohm*cm^2]'])
-        y_values = np.asarray(eis_data['-Im [Ohm*cm^2]'])
+        pressures = np.unique(ecr_data['pressure_rounded[bar]'].to_numpy(dtype=int))
+
+        x_values = pressures
+        y_values = []
+
+        for p in pressures:
+            data_pressure = ecr_data['pressure_rounded[bar]'] == p
+
+            # data: mainresistance
+            y_values.append(ecr_data[data_pressure]['as_main_resistance_mean[mOhm*cm2]'].mean())
 
         ax.plot(x_values, y_values, 's-', label=str(i[:-4]))
 
@@ -1967,6 +2029,7 @@ def export_ecr_graph(plot_list):
     plt.show()
 
     ax.legend(loc='best')
+
 
 
 # GUI-Design mainwindow

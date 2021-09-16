@@ -1,0 +1,58 @@
+KIT 1 II
+
+neues 1 mol
+
+PEIS 
+
+I	U
+0,6	0,252
+0,5	0,275
+0,4	0,302
+0,3	0,334
+0,2	0,372
+0,1	0,424
+0	0,688
+
+GEIS aufgenommen 0,5A,   20mA
+
+GEIS aufgenommen 0,2A,   20mA
+
+GEIS aufgenommen 0,2A, 10mA
+
+keine neue sinnvolle Messreihe 
+
+wechsel auf 5 mol
+
+PEIS 
+
+I	U
+0,45	0,252
+0,4	0,26
+0,3	0,281
+0,2	0,309
+0,1	0,347
+0	0,592
+
+GEIS aufgenommen 0,2A , 10mA
+
+leichte verschlechterung
+
+12:40
+
+0,4	0,246
+0,3	0,27
+0,2	0,298
+0,1	0,335
+0	0,579
+
+laufen lassen bei ocv
+
+13:30
+
+0,4	0,247
+0,3	0,269
+0,2	0,296
+0,1	0,332
+0	0,549
+
+läuft fast 2 stunden sehr konstant
